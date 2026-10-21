@@ -1,0 +1,3018 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MoodyFlow Lab — Python 50-Digit Precision, SI/Imperial & ASME Pipe Schedule Solver</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Pyodide (Official In-Browser Python 3.11 WebAssembly Runtime) -->
+  <script src="https://cdn.jsdelivr.net/pyodide/v0.25.0/full/pyodide.js" defer></script>
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            slate: {
+              850: '#151e2e',
+              925: '#0b111e',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    * {
+      -webkit-tap-highlight-color: transparent;
+    }
+    .chart-fullscreen {
+      position: fixed !important;
+      inset: 0 !important;
+      z-index: 9999 !important;
+      width: 100vw !important;
+      height: 100vh !important;
+      border-radius: 0 !important;
+      display: flex !important;
+      flex-direction: column !important;
+      padding: 16px !important;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 dark:bg-slate-925 text-slate-900 dark:text-slate-100 font-sans antialiased selection:bg-sky-500 selection:text-white min-h-screen pb-14 transition-colors duration-200">
+
+  <!-- ===================================================================== -->
+  <!-- TOP NAVIGATION BAR WITH LIVE PYTHON 3.11 STATUS BADGE                 -->
+  <!-- ===================================================================== -->
+  <header class="sticky top-0 z-40 backdrop-blur-md bg-white/90 dark:bg-slate-900/90 border-b border-slate-200 dark:border-slate-800">
+    <div class="max-w-7xl mx-auto px-3 sm:px-6 h-14 flex items-center justify-between gap-2">
+      <div class="flex items-center gap-2.5">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-sky-500 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-sky-500/20">
+          <i class="fa-brands fa-python text-base"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <h1 class="font-bold text-sm sm:text-base tracking-tight leading-none">
+              MoodyFlow<span class="text-sky-500 font-mono ml-1">Lab</span>
+            </h1>
+            <!-- Live Python Runtime Badge -->
+            <span id="pyStatusBadge" class="inline-flex items-center gap-1.5 text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/25">
+              <span id="pyStatusDot" class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping"></span>
+              <span id="pyStatusText">Python 3.11 (50-Digit): Initializing...</span>
+            </span>
+          </div>
+          <p class="text-[11px] text-slate-500 dark:text-slate-400 hidden sm:block">
+            SI &amp; Imperial Units • ASME B36.10M/19M Pipe Schedules • Python <span class="font-mono">decimal.Decimal</span> Solver
+          </p>
+        </div>
+      </div>
+
+      <!-- Header Action Buttons -->
+      <div class="flex items-center gap-1.5 sm:gap-2">
+        <!-- Global Unit System Preset Switcher (Converts or sets default units without precision loss) -->
+        <div class="inline-flex rounded-lg p-0.5 bg-slate-200/80 dark:bg-slate-800 border border-slate-300/60 dark:border-slate-700 text-[11px]">
+          <button id="btnSysSI" type="button" onclick="applyUnitSystemPreset('SI_BASE')" title="Set unit selectors to Base SI (m, m/s, m²/s, Pa·s, kg/m³)" class="px-2 py-1 rounded-md font-semibold transition-all bg-white dark:bg-slate-900 text-sky-600 dark:text-sky-400 shadow-sm">
+            SI (Base)
+          </button>
+          <button id="btnSysMetric" type="button" onclick="applyUnitSystemPreset('SI_ENG')" title="Set unit selectors to Metric Engineering (mm, m/s, cSt, cP, kg/m³)" class="px-2 py-1 rounded-md font-semibold transition-all text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hidden sm:inline-block">
+            Metric (mm)
+          </button>
+          <button id="btnSysUS" type="button" onclick="applyUnitSystemPreset('US')" title="Set unit selectors to US Imperial (in, ft/s, ft²/s, cP, lb/ft³, ft)" class="px-2 py-1 rounded-md font-semibold transition-all text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white">
+            Imperial (US)
+          </button>
+        </div>
+
+        <!-- 1-Click Load User's Exact Spreadsheet Test Case -->
+        <button onclick="loadUserTestCase()" title="Load v=1.5 m/s, D=0.3 m, ν=1e-6 m²/s, e=0.00015 m" class="px-2.5 py-1.5 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 text-sky-600 dark:text-sky-400 border border-sky-500/30 text-xs font-semibold flex items-center gap-1.5 transition">
+          <i class="fa-solid fa-bolt text-[11px]"></i>
+          <span class="hidden xl:inline">Load Test Case</span>
+          <span class="xl:hidden">Test</span>
+        </button>
+
+        <!-- Clear All Inputs -->
+        <button onclick="clearAllInputs()" title="Clear all input fields" class="px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-rose-500/10 hover:text-rose-600 dark:hover:text-rose-400 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-xs font-semibold flex items-center gap-1.5 transition">
+          <i class="fa-solid fa-eraser text-[11px]"></i>
+          <span class="hidden md:inline">Clear</span>
+        </button>
+
+        <!-- Copy Full Precision Report -->
+        <button onclick="copySummaryReport()" title="Copy 50-Digit Python Calculation Report" class="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-xs flex items-center gap-1.5 transition">
+          <i class="fa-regular fa-copy"></i>
+          <span class="hidden lg:inline font-medium">Report</span>
+        </button>
+
+        <!-- Dark/Light Theme Toggle -->
+        <button onclick="toggleTheme()" aria-label="Toggle Dark/Light Theme" class="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition">
+          <i id="themeIcon" class="fa-solid fa-sun text-amber-400 text-sm"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ===================================================================== -->
+  <!-- STICKY LIVE KPI RIBBON                                                -->
+  <!-- ===================================================================== -->
+  <div class="sticky top-14 z-30 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 shadow-sm">
+    <div class="max-w-7xl mx-auto px-3 sm:px-6 py-2 grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4 items-center">
+      <!-- Reynolds Number -->
+      <div class="bg-slate-100/80 dark:bg-slate-800/70 rounded-lg px-3 py-1.5 border border-slate-200/70 dark:border-slate-700/60">
+        <div class="text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-400 font-medium flex items-center justify-between">
+          <span>Reynolds (<span class="font-mono">Re</span>)</span>
+          <span id="kpiReSci" class="font-mono text-[10px] text-sky-600 dark:text-sky-400">--</span>
+        </div>
+        <div id="kpiRe" class="font-mono font-bold text-xs sm:text-base text-slate-900 dark:text-white truncate">Awaiting Inputs</div>
+      </div>
+
+      <!-- Darcy Friction Factor f -->
+      <div class="bg-sky-500/10 dark:bg-sky-500/15 rounded-lg px-3 py-1.5 border border-sky-500/30">
+        <div class="text-[10px] uppercase tracking-wider text-sky-700 dark:text-sky-300 font-medium flex items-center justify-between">
+          <span>Darcy <span class="font-mono italic">f</span></span>
+          <span id="kpiFSource" class="text-[9px] font-mono px-1.5 rounded bg-sky-500/20 text-sky-700 dark:text-sky-300">--</span>
+        </div>
+        <div id="kpiF" class="font-mono font-bold text-xs sm:text-base text-sky-600 dark:text-sky-400 truncate">--</div>
+      </div>
+
+      <!-- Relative Roughness e/D -->
+      <div class="bg-slate-100/80 dark:bg-slate-800/70 rounded-lg px-3 py-1.5 border border-slate-200/70 dark:border-slate-700/60">
+        <div class="text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-400 font-medium flex items-center justify-between">
+          <span>Rel. Roughness (<span class="font-mono">e/D</span>)</span>
+          <span id="kpiRelRoughSci" class="font-mono text-[10px] text-amber-600 dark:text-amber-400">--</span>
+        </div>
+        <div id="kpiRelRough" class="font-mono font-bold text-xs sm:text-base text-amber-600 dark:text-amber-400 truncate">--</div>
+      </div>
+
+      <!-- Flow Regime Badge -->
+      <div id="kpiRegimeCard" class="rounded-lg px-3 py-1.5 border flex flex-col justify-center bg-slate-100 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700">
+        <div class="text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-400 font-medium">Flow Regime</div>
+        <div class="flex items-center gap-1.5">
+          <span id="kpiRegimeDot" class="w-2 h-2 rounded-full bg-slate-400 shrink-0"></span>
+          <span id="kpiRegimeText" class="font-bold text-xs sm:text-sm text-slate-600 dark:text-slate-300 truncate">Enter Values</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- MAIN WORKSPACE GRID                                                   -->
+  <!-- ===================================================================== -->
+  <main class="max-w-7xl mx-auto px-3 sm:px-6 pt-5 grid grid-cols-1 lg:grid-cols-12 gap-5">
+
+    <!-- ========================================================= -->
+    <!-- LEFT COLUMN: BASE SI INPUTS & PYTHON 50-DIGIT READOUT     -->
+    <!-- ========================================================= -->
+    <section class="lg:col-span-5 space-y-4">
+
+      <!-- 1. REYNOLDS NUMBER INPUT CARD (Base SI Default) -->
+      <div class="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+        <div class="flex items-center justify-between">
+          <h2 class="text-sm font-bold flex items-center gap-2">
+            <span class="w-6 h-6 rounded-lg bg-sky-500/10 text-sky-500 flex items-center justify-center text-xs font-mono">1</span>
+            <span>Reynolds Number (<span class="font-mono">Re</span>)</span>
+          </h2>
+          <!-- Toggle: Calculate Re vs Direct Re -->
+          <div class="inline-flex rounded-lg p-0.5 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[11px]">
+            <button id="btnReModeCalc" type="button" onclick="setReMode('calc')" class="px-2.5 py-1 rounded-md font-semibold bg-white dark:bg-slate-900 text-sky-600 dark:text-sky-400 shadow-sm transition">
+              Calculate Re
+            </button>
+            <button id="btnReModeDirect" type="button" onclick="setReMode('direct')" class="px-2.5 py-1 rounded-md font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition">
+              Direct Re
+            </button>
+          </div>
+        </div>
+
+        <!-- PANEL 1A: CALCULATE RE FROM VELOCITY, DIAMETER & VISCOSITY -->
+        <div id="panelReCalc" class="space-y-3.5">
+
+          <!-- Fluid Velocity (v) OR Volumetric Flow Rate (Q) -->
+          <div class="bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl border border-slate-200/80 dark:border-slate-700/60 space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-semibold text-slate-700 dark:text-slate-200">Fluid Flow Input</span>
+              <div class="inline-flex rounded-lg p-0.5 bg-slate-200/70 dark:bg-slate-900 border border-slate-300/60 dark:border-slate-700 text-[11px]">
+                <button id="btnFlowV" type="button" onclick="setFlowMode('V')" class="px-2 py-0.5 rounded font-semibold bg-white dark:bg-slate-800 text-sky-600 dark:text-sky-400 shadow-sm">
+                  Velocity (v)
+                </button>
+                <button id="btnFlowQ" type="button" onclick="setFlowMode('Q')" class="px-2 py-0.5 rounded font-semibold text-slate-600 dark:text-slate-400">
+                  Flow Rate (Q)
+                </button>
+              </div>
+            </div>
+
+            <!-- Fluid Velocity v (SI or Imperial) -->
+            <div id="boxFlowV">
+              <div class="flex items-center justify-between mb-1">
+                <label for="inputVelocity" class="text-xs text-slate-600 dark:text-slate-300">
+                  Fluid Velocity (<span class="font-mono text-emerald-500 font-semibold">v</span>)
+                </label>
+                <select id="unitVelocity" onchange="recalculateAll()" class="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-md px-2 py-0.5 text-xs font-mono text-emerald-600 dark:text-emerald-400 focus:outline-none">
+                  <option value="m/s" selected>m/s (SI)</option>
+                  <option value="ft/s">ft/s (Imperial)</option>
+                </select>
+              </div>
+              <input id="inputVelocity" type="text" inputmode="decimal" autocomplete="off" placeholder="e.g. 1.5" oninput="recalculateAll()" class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 font-mono text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-sky-500" />
+              <div id="subtextVelocity" class="text-[10px] font-mono text-slate-400 mt-1"></div>
+            </div>
+
+            <!-- Volumetric Flow Rate Q -->
+            <div id="boxFlowQ" class="hidden">
+              <div class="flex items-center justify-between mb-1">
+                <label for="inputFlowRate" class="text-xs text-slate-600 dark:text-slate-300">
+                  Volumetric Flow Rate (<span class="font-mono text-emerald-500 font-semibold">Q</span>)
+                </label>
+                <select id="unitFlowRate" onchange="recalculateAll()" class="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-md px-2 py-0.5 text-xs font-mono text-emerald-600 dark:text-emerald-400 focus:outline-none">
+                  <option value="m3/s" selected>m³/s (Base SI)</option>
+                  <option value="L/s">L/s (Metric)</option>
+                  <option value="m3/h">m³/h (Metric)</option>
+                  <option value="gpm">GPM (US gal/min)</option>
+                  <option value="cfs">ft³/s (CFS Imperial)</option>
+                </select>
+              </div>
+              <input id="inputFlowRate" type="text" inputmode="decimal" autocomplete="off" placeholder="e.g. 0.10602875" oninput="recalculateAll()" class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 font-mono text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-sky-500" />
+              <div id="subtextFlowRate" class="text-[10px] font-mono text-slate-400 mt-1"></div>
+            </div>
+          </div>
+
+          <!-- Pipe Internal Diameter (D) — Manual Input OR ASME Pipe Schedule Selector -->
+          <div class="bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl border border-slate-200/80 dark:border-slate-700/60 space-y-2.5">
+            <div class="flex items-center justify-between flex-wrap gap-1">
+              <label for="inputDiameter" class="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                Pipe Internal Diameter (<span class="font-mono text-sky-500">D</span>)
+              </label>
+              <!-- Toggle: Manual ID vs Standard Pipe & Schedule -->
+              <div class="inline-flex rounded-lg p-0.5 bg-slate-200/70 dark:bg-slate-900 border border-slate-300/60 dark:border-slate-700 text-[11px]">
+                <button id="btnDiamManual" type="button" onclick="setPipeSelectMode('manual')" class="px-2 py-0.5 rounded font-semibold bg-white dark:bg-slate-800 text-sky-600 dark:text-sky-400 shadow-sm">
+                  Manual ID
+                </button>
+                <button id="btnDiamStd" type="button" onclick="setPipeSelectMode('schedule')" class="px-2 py-0.5 rounded font-semibold text-slate-600 dark:text-slate-400">
+                  <i class="fa-solid fa-table-cells-large text-[10px] mr-0.5"></i>Pipe &amp; Sch
+                </button>
+              </div>
+            </div>
+
+            <!-- Standard Pipe Nominal Size (NPS / DN) & Schedule Selector Drawer -->
+            <div id="boxPipeScheduleSelector" class="hidden bg-white dark:bg-slate-900/90 p-2.5 rounded-xl border border-sky-500/30 space-y-2">
+              <div class="text-[10px] font-mono uppercase tracking-wider text-sky-600 dark:text-sky-400 font-semibold flex items-center justify-between">
+                <span>ASME B36.10M / B36.19M Pipe Standard</span>
+                <span id="pipeStdTag">Carbon &amp; Alloy / Stainless</span>
+              </div>
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label for="selectPipeNPS" class="block text-[10px] font-medium text-slate-500 dark:text-slate-400 mb-0.5">Nominal Pipe Size (NPS / DN)</label>
+                  <select id="selectPipeNPS" onchange="onNPSChange()" class="w-full rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 px-2 py-1.5 text-xs font-mono font-semibold focus:outline-none focus:ring-2 focus:ring-sky-500">
+                    <!-- Populated from ASME_PIPE_DATABASE -->
+                  </select>
+                </div>
+                <div>
+                  <label for="selectPipeSch" class="block text-[10px] font-medium text-slate-500 dark:text-slate-400 mb-0.5">Pipe Schedule / Wall</label>
+                  <select id="selectPipeSch" onchange="onScheduleChange()" class="w-full rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 px-2 py-1.5 text-xs font-mono font-semibold focus:outline-none focus:ring-2 focus:ring-sky-500">
+                    <!-- Populated dynamically for selected NPS -->
+                  </select>
+                </div>
+              </div>
+              <!-- Pipe Geometry Audit Badge (OD, Wall Thickness, Exact ID) -->
+              <div id="pipeSpecSummary" class="text-[10px] font-mono bg-sky-500/10 text-sky-700 dark:text-sky-300 px-2.5 py-1.5 rounded-lg border border-sky-500/20 flex flex-wrap items-center justify-between gap-1">
+                <span>OD: --</span>
+                <span>Wall: --</span>
+                <span class="font-bold">ID: --</span>
+              </div>
+            </div>
+
+            <!-- Diameter Numeric Input + Unit Selector (m, mm, in, ft) -->
+            <div>
+              <div class="flex items-center justify-between mb-1">
+                <span id="labelDiameterSource" class="text-[11px] text-slate-500 dark:text-slate-400">Enter internal diameter <span class="font-mono">D</span></span>
+                <select id="unitDiameter" onchange="onDiameterUnitChange()" class="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-md px-2 py-0.5 text-xs font-mono text-sky-600 dark:text-sky-400 focus:outline-none focus:ring-1 focus:ring-sky-500">
+                  <option value="m" selected>m (Base SI)</option>
+                  <option value="mm">mm (Metric)</option>
+                  <option value="in">in (Imperial)</option>
+                  <option value="ft">ft (Imperial)</option>
+                </select>
+              </div>
+              <input id="inputDiameter" type="text" inputmode="decimal" autocomplete="off" placeholder="e.g. 0.3" oninput="onManualDiameterEdit()" class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 font-mono text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-sky-500" />
+              <div id="subtextDiameter" class="text-[10px] font-mono text-slate-400 mt-1"></div>
+            </div>
+          </div>
+
+          <!-- Fluid Preset Library + Viscosity Mode Selector: Kinematic (ν) Default vs Dynamic (μ & ρ) -->
+          <div class="bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl border border-slate-200/80 dark:border-slate-700/60 space-y-3">
+            <div class="flex items-center justify-between flex-wrap gap-1">
+              <span class="text-xs font-semibold text-slate-700 dark:text-slate-200">Fluid Properties &amp; Viscosity</span>
+              <div class="inline-flex rounded-lg p-0.5 bg-slate-200/70 dark:bg-slate-900 border border-slate-300/60 dark:border-slate-700 text-[11px]">
+                <button id="btnViscKinematic" type="button" onclick="setViscMode('kinematic')" class="px-2 py-0.5 rounded font-semibold bg-white dark:bg-slate-800 text-sky-600 dark:text-sky-400 shadow-sm">
+                  Kinematic (ν)
+                </button>
+                <button id="btnViscDynamic" type="button" onclick="setViscMode('dynamic')" class="px-2 py-0.5 rounded font-semibold text-slate-600 dark:text-slate-400">
+                  Dynamic (μ &amp; ρ)
+                </button>
+              </div>
+            </div>
+
+            <!-- Pre-Loaded Industrial Fluid Property Selector -->
+            <div class="bg-white dark:bg-slate-900/90 p-2.5 rounded-xl border border-slate-200/90 dark:border-slate-700/80 space-y-1.5">
+              <div class="flex items-center justify-between">
+                <label for="selectFluidPreset" class="text-[11px] font-semibold text-sky-600 dark:text-sky-400 flex items-center gap-1">
+                  <i class="fa-solid fa-flask text-[10px]"></i>
+                  <span>Fluid Property Preset (Optional Quick-Load)</span>
+                </label>
+                <span id="fluidPresetTag" class="text-[10px] font-mono text-slate-400">Manual / Custom</span>
+              </div>
+              <select id="selectFluidPreset" onchange="applyFluidPreset(this.value)" class="w-full rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 px-2.5 py-1.5 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-sky-500">
+                <option value="custom" selected>-- Custom / Manual Fluid Entry --</option>
+                <optgroup label="Water &amp; Aqueous Solutions">
+                  <option value="water20">Water @ 20°C (ρ=998.2 kg/m³, μ=1.002 cP, ν=1.004 cSt)</option>
+                  <option value="water40">Water @ 40°C (ρ=992.2 kg/m³, μ=0.653 cP, ν=0.658 cSt)</option>
+                  <option value="water80">Water @ 80°C (ρ=971.8 kg/m³, μ=0.355 cP, ν=0.365 cSt)</option>
+                  <option value="seawater20">Seawater 3.5% @ 20°C (ρ=1025 kg/m³, μ=1.07 cP, ν=1.044 cSt)</option>
+                </optgroup>
+                <optgroup label="Acids &amp; Chemical Process Fluids">
+                  <option value="h2so4_98_20">Sulfuric Acid (H₂SO₄) 98.5% @ 20°C (ρ=1836 kg/m³, μ=24.5 cP)</option>
+                  <option value="h2so4_98_40">Sulfuric Acid (H₂SO₄) 98.5% @ 40°C (ρ=1816 kg/m³, μ=14.2 cP)</option>
+                  <option value="h2so4_93_20">Sulfuric Acid (H₂SO₄) 93% @ 20°C (ρ=1828 kg/m³, μ=21.8 cP)</option>
+                  <option value="h3po4_54_40">Phosphoric Acid (54% P₂O₅) @ 40°C (ρ=1620 kg/m³, μ=18.5 cP)</option>
+                  <option value="h3po4_85_20">Phosphoric Acid (H₃PO₄) 85% @ 20°C (ρ=1685 kg/m³, μ=47.0 cP)</option>
+                  <option value="hcl_32_20">Hydrochloric Acid (HCl) 32% @ 20°C (ρ=1159 kg/m³, μ=1.90 cP)</option>
+                  <option value="naoh_50_20">Sodium Hydroxide (NaOH) 50% @ 20°C (ρ=1525 kg/m³, μ=78.0 cP)</option>
+                  <option value="nh3_liq_20">Liquid Ammonia (NH₃ Sat.) @ 20°C (ρ=610.3 kg/m³, μ=0.141 cP)</option>
+                </optgroup>
+                <optgroup label="Oils, Fuels &amp; Lubricants">
+                  <option value="coating_oil_60">Coating / Process Oil @ 60°C (ρ=875 kg/m³, μ=32.0 cP, ν=36.57 cSt)</option>
+                  <option value="iso_vg46_40">Hydraulic Oil ISO VG 46 @ 40°C (ρ=870 kg/m³, μ=40.02 cP, ν=46.0 cSt)</option>
+                  <option value="iso_vg68_40">Lubricating Oil ISO VG 68 @ 40°C (ρ=876 kg/m³, μ=59.57 cP, ν=68.0 cSt)</option>
+                  <option value="sae30_20">SAE 30 Engine Oil @ 20°C (ρ=891 kg/m³, μ=290 cP, ν=325.5 cSt)</option>
+                  <option value="diesel_20">Diesel Fuel @ 20°C (ρ=832 kg/m³, μ=3.00 cP, ν=3.606 cSt)</option>
+                  <option value="hfo_50">Heavy Fuel Oil / Bunker C @ 50°C (ρ=960 kg/m³, μ=380 cP, ν=395.8 cSt)</option>
+                </optgroup>
+                <optgroup label="Glycols &amp; Gases">
+                  <option value="glycol50_20">Ethylene Glycol 50% @ 20°C (ρ=1065 kg/m³, μ=3.80 cP, ν=3.568 cSt)</option>
+                  <option value="air20">Air @ 20°C, 1 atm (ρ=1.204 kg/m³, μ=0.01825 cP, ν=15.16 cSt)</option>
+                </optgroup>
+              </select>
+              <div id="fluidPresetSummaryBadge" class="hidden text-[10px] font-mono bg-sky-500/10 text-sky-700 dark:text-sky-300 px-2.5 py-1 rounded-lg border border-sky-500/20 flex flex-wrap items-center justify-between gap-1">
+                <!-- Populated when a preset is chosen -->
+              </div>
+            </div>
+
+            <!-- Kinematic Viscosity Input (m²/s, cSt, ft²/s) -->
+            <div id="boxKinematicVisc" class="space-y-1.5">
+              <div class="flex items-center justify-between">
+                <label for="inputKinVisc" class="text-xs text-slate-600 dark:text-slate-300">
+                  Fluid Kinematic Viscosity (<span class="font-mono text-sky-500 font-semibold">ν</span>)
+                </label>
+                <select id="unitKinVisc" onchange="onKinViscUnitChange()" class="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-md px-2 py-0.5 text-xs font-mono text-sky-600 dark:text-sky-400 focus:outline-none">
+                  <option value="m2s" selected>m²/s (Base SI)</option>
+                  <option value="mm2s">cSt (mm²/s)</option>
+                  <option value="ft2s">ft²/s (Imperial)</option>
+                </select>
+              </div>
+              <input id="inputKinVisc" type="text" inputmode="decimal" autocomplete="off" placeholder="e.g. 1.00E-06 or 0.000001" oninput="onManualFluidInputEdit()" class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 font-mono text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-sky-500" />
+            </div>
+
+            <!-- Dynamic Viscosity Input (Pa·s, cP, lb/(ft·s)) + Density (kg/m³, lb/ft³, SG) -->
+            <div id="boxDynamicVisc" class="hidden space-y-2.5">
+              <div>
+                <div class="flex items-center justify-between mb-1">
+                  <label for="inputDynVisc" class="text-xs text-slate-600 dark:text-slate-300">
+                    Dynamic Viscosity (<span class="font-mono text-sky-500 font-semibold">μ</span>)
+                  </label>
+                  <select id="unitDynVisc" onchange="onDynViscUnitChange()" class="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-md px-2 py-0.5 text-xs font-mono text-sky-600 dark:text-sky-400 focus:outline-none">
+                    <option value="Pas" selected>Pa·s (Base SI)</option>
+                    <option value="mPas">cP (mPa·s)</option>
+                    <option value="lbfts">lb/(ft·s) (Imperial)</option>
+                  </select>
+                </div>
+                <input id="inputDynVisc" type="text" inputmode="decimal" autocomplete="off" placeholder="e.g. 0.001" oninput="onManualFluidInputEdit()" class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 font-mono text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-sky-500" />
+              </div>
+
+              <div>
+                <div class="flex items-center justify-between mb-1">
+                  <label for="inputDensity" class="text-xs text-slate-600 dark:text-slate-300">
+                    Fluid Density (<span class="font-mono text-sky-500 font-semibold">ρ</span>)
+                  </label>
+                  <select id="unitDensity" onchange="onMainDensityUnitChange()" class="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-md px-2 py-0.5 text-xs font-mono text-sky-600 dark:text-sky-400 focus:outline-none">
+                    <option value="kgm3" selected>kg/m³ (SI)</option>
+                    <option value="lbft3">lb/ft³ (Imperial)</option>
+                    <option value="sg">g/cm³ (SG)</option>
+                  </select>
+                </div>
+                <input id="inputDensity" type="text" inputmode="decimal" autocomplete="off" placeholder="e.g. 1000" oninput="onMainDensityEdit(this.value)" class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 font-mono text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-sky-500" />
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- PANEL 1B: DIRECT DIMENSIONLESS REYNOLDS NUMBER INPUT -->
+        <div id="panelReDirect" class="hidden">
+          <div class="bg-slate-50 dark:bg-slate-800/60 p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-700/60 space-y-2">
+            <div class="flex items-center justify-between">
+              <label for="inputDirectRe" class="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                Direct Reynolds Number (<span class="font-mono text-sky-500">Re</span>)
+              </label>
+              <span class="text-[11px] font-mono text-slate-400">Dimensionless</span>
+            </div>
+            <input id="inputDirectRe" type="text" inputmode="decimal" autocomplete="off" placeholder="e.g. 450000 or 4.5e5" oninput="recalculateAll()" class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 font-mono text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-sky-500" />
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. PIPE ROUGHNESS INPUT CARD (e in Base SI m OR Direct e/D) -->
+      <div class="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200 dark:border-slate-800 shadow-sm space-y-3.5">
+        <div class="flex items-center justify-between">
+          <h2 class="text-sm font-bold flex items-center gap-2">
+            <span class="w-6 h-6 rounded-lg bg-amber-500/10 text-amber-500 flex items-center justify-center text-xs font-mono">2</span>
+            <span>Pipe Roughness (<span class="font-mono">e</span> or <span class="font-mono">e/D</span>)</span>
+          </h2>
+          <!-- Toggle: Absolute Roughness e vs Direct Relative Roughness e/D -->
+          <div class="inline-flex rounded-lg p-0.5 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[11px]">
+            <button id="btnRoughAbs" type="button" onclick="setRoughnessMode('abs')" class="px-2.5 py-1 rounded-md font-semibold bg-white dark:bg-slate-900 text-amber-600 dark:text-amber-400 shadow-sm transition">
+              Roughness (e)
+            </button>
+            <button id="btnRoughRel" type="button" onclick="setRoughnessMode('rel')" class="px-2.5 py-1 rounded-md font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition">
+              Direct (e/D)
+            </button>
+          </div>
+        </div>
+
+        <!-- Option A: Absolute Roughness e (Default: Base SI m) -->
+        <div id="panelRoughAbs" class="bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl border border-slate-200/80 dark:border-slate-700/60 space-y-2.5">
+          <!-- Optional Material Quick-Fill Helper -->
+          <div>
+            <div class="flex items-center justify-between mb-1">
+              <label for="selectRoughMaterial" class="text-[11px] font-medium text-slate-500 dark:text-slate-400">Standard Surface Material / Liner (Optional Quick-Fill)</label>
+            </div>
+            <select id="selectRoughMaterial" onchange="applyMaterialRoughnessPreset(this.value)" class="w-full rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 px-2.5 py-1.5 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-amber-500">
+              <option value="custom" selected>-- Custom / Manual Roughness Input --</option>
+              <option value="0">Hydraulically Smooth Pipe (e = 0 mm)</option>
+              <option value="0.0015">PFA / PTFE / Fluoropolymer Lined Pipe (0.0015 mm | 0.000005 ft)</option>
+              <option value="0.0015">HDPE / PVC / Drawn Copper / Glass (0.0015 mm | 0.000005 ft)</option>
+              <option value="0.01">Rubber Lined Steel Pipe (0.010 mm | 0.000033 ft)</option>
+              <option value="0.015">Commercial Stainless Steel — 304/316 (0.015 mm | 0.00005 ft)</option>
+              <option value="0.045">Commercial Carbon Steel, New (0.045 mm | 0.00015 ft)</option>
+              <option value="0.15">Galvanized Steel / Iron (0.15 mm | 0.0005 ft)</option>
+              <option value="0.26">Uncoated Cast Iron (0.26 mm | 0.00085 ft)</option>
+              <option value="0.3">Smooth Finished Concrete (0.30 mm | 0.001 ft)</option>
+              <option value="2.0">Rough Concrete (2.0 mm | 0.0066 ft)</option>
+            </select>
+          </div>
+
+          <div class="flex items-center justify-between">
+            <label for="inputRoughnessAbs" class="text-xs font-semibold text-slate-700 dark:text-slate-200">
+              Pipe Roughness (<span class="font-mono text-amber-500">e</span>)
+            </label>
+            <select id="unitRoughnessAbs" onchange="onRoughnessUnitChange()" class="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-md px-2 py-0.5 text-xs font-mono text-amber-600 dark:text-amber-400 focus:outline-none">
+              <option value="m" selected>m (Base SI)</option>
+              <option value="mm">mm (Metric)</option>
+              <option value="in">in (Imperial)</option>
+              <option value="ft">ft (Imperial)</option>
+            </select>
+          </div>
+          <input id="inputRoughnessAbs" type="text" inputmode="decimal" autocomplete="off" placeholder="e.g. 0.00015 (0 for smooth)" oninput="onManualRoughnessEdit()" class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 font-mono text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-amber-500" />
+          <p id="roughAbsHint" class="text-[11px] text-slate-500 dark:text-slate-400">
+            Computes <span class="font-mono">e / D</span> in 50-digit Python <span class="font-mono">Decimal</span> precision.
+          </p>
+        </div>
+
+        <!-- Option B: Direct Relative Roughness e/D -->
+        <div id="panelRoughRel" class="hidden bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl border border-slate-200/80 dark:border-slate-700/60 space-y-2">
+          <div class="flex items-center justify-between">
+            <label for="inputRoughnessRel" class="text-xs font-semibold text-slate-700 dark:text-slate-200">
+              Direct Relative Roughness (<span class="font-mono text-amber-500">e/D</span>)
+            </label>
+            <span class="text-[11px] font-mono text-slate-400">Dimensionless</span>
+          </div>
+          <input id="inputRoughnessRel" type="text" inputmode="decimal" autocomplete="off" placeholder="e.g. 0.0005 (0 for smooth)" oninput="recalculateAll()" class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 font-mono text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-amber-500" />
+        </div>
+      </div>
+
+      <!-- 3. PYTHON 50-DIGIT ARBITRARY-PRECISION ENGINE READOUT CARD -->
+      <div class="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-sky-500/30 dark:border-sky-500/30 shadow-sm space-y-3">
+        <div class="flex items-center justify-between">
+          <h2 class="text-xs font-bold uppercase tracking-wider text-sky-600 dark:text-sky-400 flex items-center gap-1.5">
+            <i class="fa-brands fa-python text-sm"></i>
+            <span>Python 50-Digit Decimal Engine Output</span>
+          </h2>
+          <button onclick="togglePythonSourceDrawer()" class="text-[11px] font-mono text-slate-500 dark:text-slate-400 hover:text-sky-500 underline">
+            <span id="btnPyCodeToggleText">View Python Code</span>
+          </button>
+        </div>
+
+        <div class="bg-slate-900 text-slate-100 rounded-xl p-3 font-mono text-[11px] space-y-2 border border-slate-800 overflow-x-auto">
+          <div>
+            <div class="text-slate-400 text-[10px]">Exact Reynolds Number (<span class="text-sky-400">Re = v·D / ν</span>):</div>
+            <div id="pyOutRe" class="text-sky-300 font-bold break-all select-all">--</div>
+          </div>
+          <div>
+            <div class="text-slate-400 text-[10px]">Exact Relative Roughness (<span class="text-amber-400">e / D</span>):</div>
+            <div id="pyOutRelRough" class="text-amber-300 font-bold break-all select-all">--</div>
+          </div>
+          <div>
+            <div class="text-slate-400 text-[10px] flex justify-between">
+              <span>Colebrook-White Darcy <span class="text-emerald-400">f</span> (50-Digit Decimal):</span>
+              <button onclick="copyExactF()" class="text-[10px] text-sky-400 hover:underline"><i class="fa-regular fa-copy mr-0.5"></i>Copy f</button>
+            </div>
+            <div id="pyOutF50" class="text-emerald-400 font-bold break-all select-all">--</div>
+          </div>
+          <div class="pt-1 border-t border-slate-800 flex justify-between text-[10px] text-slate-400">
+            <span>Colebrook Residual |LHS - RHS|:</span>
+            <span id="pyOutResidual" class="text-emerald-300 font-semibold">--</span>
+          </div>
+        </div>
+
+        <!-- Collapsible Drawer Showing Actual Python Source Code Running in Pyodide -->
+        <div id="pySourceDrawer" class="hidden">
+          <div class="text-[10px] font-mono text-slate-500 dark:text-slate-400 mb-1">
+            Active Python <span class="text-sky-500">decimal.Decimal</span> code executed in browser:
+          </div>
+          <pre id="pyCodeDisplay" class="bg-slate-950 text-slate-300 p-3 rounded-xl text-[10px] font-mono overflow-x-auto border border-slate-800 leading-relaxed"></pre>
+        </div>
+      </div>
+
+      <!-- 4. OPTIONAL PIPE LENGTH & DARCY-WEISBACH HEAD LOSS -->
+      <div class="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200 dark:border-slate-800 shadow-sm space-y-3">
+        <div class="flex items-center justify-between">
+          <h2 class="text-sm font-bold flex items-center gap-2">
+            <span class="w-6 h-6 rounded-lg bg-indigo-500/10 text-indigo-500 flex items-center justify-center text-xs font-mono">3</span>
+            <span>Darcy-Weisbach Head Loss <span class="text-xs font-normal text-slate-400">(Optional)</span></span>
+          </h2>
+          <span class="text-[10px] font-mono text-slate-400">h<sub>f</sub> = f·(L/D)·(v²/2g)</span>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2.5">
+          <div class="bg-slate-50 dark:bg-slate-800/60 p-2.5 rounded-xl border border-slate-200/80 dark:border-slate-700/60">
+            <div class="flex justify-between items-center mb-1">
+              <label for="inputLength" class="text-[11px] font-semibold text-slate-600 dark:text-slate-300">Pipe Length (<span class="font-mono">L</span>)</label>
+              <select id="unitLength" onchange="recalculateAll()" class="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded px-1.5 py-0.5 text-[11px] font-mono text-indigo-600 dark:text-indigo-400 focus:outline-none">
+                <option value="m" selected>m (SI)</option>
+                <option value="ft">ft (Imperial)</option>
+                <option value="km">km</option>
+                <option value="mi">mi</option>
+              </select>
+            </div>
+            <input id="inputLength" type="text" inputmode="decimal" autocomplete="off" placeholder="e.g. 100" oninput="recalculateAll()" class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 font-mono text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+
+          <div class="bg-slate-50 dark:bg-slate-800/60 p-2.5 rounded-xl border border-slate-200/80 dark:border-slate-700/60">
+            <div class="flex justify-between items-center mb-1">
+              <label for="inputDensityOpt" class="text-[11px] font-semibold text-slate-600 dark:text-slate-300">Density (<span class="font-mono">ρ</span>, ΔP)</label>
+              <select id="unitDensityOpt" onchange="onOptDensityUnitChange()" class="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded px-1.5 py-0.5 text-[11px] font-mono text-indigo-600 dark:text-indigo-400 focus:outline-none">
+                <option value="kgm3" selected>kg/m³</option>
+                <option value="lbft3">lb/ft³</option>
+                <option value="sg">g/cm³</option>
+              </select>
+            </div>
+            <input id="inputDensityOpt" type="text" inputmode="decimal" autocomplete="off" placeholder="e.g. 1000" oninput="onOptDensityChange(this.value)" class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 font-mono text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-2 pt-1">
+          <div class="bg-slate-50 dark:bg-slate-800/70 p-2.5 rounded-xl border border-slate-200/80 dark:border-slate-700/60">
+            <div class="text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-400 font-medium">Head Loss (h<sub>f</sub>)</div>
+            <div id="resHeadLoss" class="font-mono font-bold text-xs sm:text-sm text-indigo-600 dark:text-indigo-400 mt-0.5">--</div>
+            <div id="resHeadLossSub" class="text-[10px] font-mono text-slate-400">--</div>
+          </div>
+          <div class="bg-slate-50 dark:bg-slate-800/70 p-2.5 rounded-xl border border-slate-200/80 dark:border-slate-700/60">
+            <div class="text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-400 font-medium">Pressure Drop (ΔP)</div>
+            <div id="resPressureDrop" class="font-mono font-bold text-xs sm:text-sm text-rose-600 dark:text-rose-400 mt-0.5">--</div>
+            <div id="resPressureBar" class="text-[10px] font-mono text-slate-400">--</div>
+          </div>
+          <div class="bg-slate-50 dark:bg-slate-800/70 p-2.5 rounded-xl border border-slate-200/80 dark:border-slate-700/60">
+            <div class="text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-400 font-medium">Velocity Head</div>
+            <div id="resVelHead" class="font-mono font-bold text-xs sm:text-sm text-emerald-600 dark:text-emerald-400 mt-0.5">--</div>
+            <div id="resWallShear" class="text-[10px] font-mono text-slate-400">--</div>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ========================================================= -->
+    <!-- RIGHT COLUMN: INTERACTIVE MOODY CHART & SOLVER TABLES     -->
+    <!-- ========================================================= -->
+    <section class="lg:col-span-7 space-y-4">
+
+      <!-- INTERACTIVE MOODY CHART CARD -->
+      <div id="moodyCardContainer" class="bg-white dark:bg-slate-900 rounded-2xl p-3 sm:p-4 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col space-y-3">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <div class="flex items-center gap-2">
+              <h2 class="text-sm sm:text-base font-bold tracking-tight flex items-center gap-2">
+                <i class="fa-solid fa-chart-line text-sky-500"></i>
+                <span>Interactive Moody Diagram</span>
+              </h2>
+              <span id="subRegimePill" class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-500/10 text-slate-500 dark:text-slate-400 border border-slate-500/20">
+                Awaiting Valid Inputs
+              </span>
+            </div>
+            <p class="text-[11px] text-slate-500 dark:text-slate-400">
+              Log-Log Darcy Friction Factor <span class="font-mono">f</span> vs. Reynolds Number <span class="font-mono">Re</span> &amp; Relative Roughness <span class="font-mono">e/D</span>
+            </p>
+          </div>
+
+          <!-- Chart Toolbar -->
+          <div class="flex items-center gap-1.5">
+            <!-- Inspect vs Set Point Mode -->
+            <div class="inline-flex rounded-lg p-0.5 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[11px]">
+              <button id="btnTouchInspect" type="button" onclick="setChartTouchMode('inspect')" class="px-2 py-1 rounded-md font-semibold bg-white dark:bg-slate-900 text-sky-600 dark:text-sky-400 shadow-sm flex items-center gap-1" title="Crosshair inspection without modifying inputs">
+                <i class="fa-solid fa-crosshairs"></i>
+                <span>Inspect</span>
+              </button>
+              <button id="btnTouchSet" type="button" onclick="setChartTouchMode('set')" class="px-2 py-1 rounded-md font-semibold text-slate-600 dark:text-slate-400 flex items-center gap-1" title="Click or drag on chart to set Re and e/D directly">
+                <i class="fa-solid fa-hand-pointer"></i>
+                <span>Set Point</span>
+              </button>
+            </div>
+
+            <button onclick="exportMoodyPNG()" title="Download Moody Chart Image" class="px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-xs flex items-center gap-1 transition">
+              <i class="fa-solid fa-download"></i>
+              <span class="hidden sm:inline font-medium">PNG</span>
+            </button>
+
+            <button id="btnFullscreenChart" onclick="toggleFullscreenChart()" title="Toggle Fullscreen Chart" class="px-2.5 py-1.5 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 text-sky-600 dark:text-sky-400 border border-sky-500/30 text-xs flex items-center gap-1 transition">
+              <i id="iconFullscreen" class="fa-solid fa-expand"></i>
+              <span id="textFullscreen" class="hidden sm:inline font-semibold">Expand</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Canvas Container -->
+        <div id="canvasContainer" class="relative w-full h-[360px] sm:h-[460px] lg:h-[500px] flex-1 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-slate-950 select-none touch-none">
+          <canvas id="moodyCanvas" class="w-full h-full block cursor-crosshair"></canvas>
+
+          <!-- Floating Inspector HUD -->
+          <div id="chartInspectorHud" class="hidden pointer-events-none absolute top-2.5 left-2.5 bg-slate-900/90 backdrop-blur-md text-white px-2.5 py-1.5 rounded-lg border border-slate-700 text-[11px] font-mono shadow-lg space-x-2">
+            <span class="text-slate-400">Cursor:</span>
+            <span id="hudRe" class="text-sky-400">Re: --</span>
+            <span id="hudF" class="text-emerald-400">f: --</span>
+            <span id="hudED" class="text-amber-400">e/D: --</span>
+          </div>
+        </div>
+
+        <!-- Legend Footer -->
+        <div class="flex flex-wrap items-center justify-between gap-2 pt-1 text-[11px] text-slate-600 dark:text-slate-400">
+          <div class="flex flex-wrap items-center gap-3">
+            <span class="inline-flex items-center gap-1.5">
+              <span class="w-3 h-0.5 bg-emerald-400 inline-block"></span>
+              <span>Laminar (<span class="font-mono">64/Re</span>)</span>
+            </span>
+            <span class="inline-flex items-center gap-1.5">
+              <span class="w-3 h-0.5 bg-sky-400 inline-block"></span>
+              <span>Smooth Pipe (<span class="font-mono">e/D=0</span>)</span>
+            </span>
+            <span class="inline-flex items-center gap-1.5">
+              <span class="w-3.5 h-1 rounded bg-amber-400 inline-block"></span>
+              <span>Active <span class="font-mono">e/D</span> Curve</span>
+            </span>
+            <span class="inline-flex items-center gap-1.5">
+              <span class="w-3 h-0.5 border-b border-dashed border-rose-400 inline-block"></span>
+              <span>Fully Rough Threshold</span>
+            </span>
+          </div>
+          <span class="text-[10px] font-mono text-slate-400">Hover/Touch chart to inspect coordinates</span>
+        </div>
+      </div>
+
+      <!-- COLEBROOK-WHITE SOLVER & CORRELATION COMPARISON TABLE -->
+      <div class="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <h2 class="text-sm font-bold flex items-center gap-2">
+            <span class="w-6 h-6 rounded-lg bg-sky-500/10 text-sky-500 flex items-center justify-center text-xs"><i class="fa-solid fa-square-root-variable"></i></span>
+            <span>Colebrook-White Solver &amp; Formula Comparison</span>
+          </h2>
+          <span id="solverStatusBadge" class="text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-slate-500/10 text-slate-500 dark:text-slate-400 border border-slate-500/20">
+            Waiting for input...
+          </span>
+        </div>
+
+        <!-- Equation Box -->
+        <div class="bg-slate-50 dark:bg-slate-800/70 rounded-xl p-3 border border-slate-200/80 dark:border-slate-700/60 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div class="font-mono text-xs sm:text-sm text-slate-800 dark:text-slate-200 overflow-x-auto">
+            <span class="text-sky-600 dark:text-sky-400 font-bold">1 / √f</span> = −2.0 · log<sub>10</sub><span class="text-slate-400">[</span>
+            <span class="text-amber-600 dark:text-amber-400">(e/D) / 3.7</span> +
+            <span class="text-emerald-600 dark:text-emerald-400">2.51 / (Re · √f)</span>
+            <span class="text-slate-400">]</span>
+          </div>
+          <button onclick="toggleIterationTable()" class="self-start sm:self-auto text-xs font-semibold text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-1 shrink-0">
+            <i class="fa-solid fa-table-list"></i>
+            <span id="btnIterText">Show Iteration Log</span>
+          </button>
+        </div>
+
+        <!-- Collapsible Newton-Raphson Iteration Log -->
+        <div id="iterationLogContainer" class="hidden overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
+          <table class="w-full text-left border-collapse font-mono text-xs">
+            <thead>
+              <tr class="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700">
+                <th class="py-2 px-3">Step (k)</th>
+                <th class="py-2 px-3">x<sub>k</sub> = 1/√f</th>
+                <th class="py-2 px-3">Darcy Friction Factor (f<sub>k</sub>)</th>
+                <th class="py-2 px-3">Residual |g(x<sub>k</sub>)|</th>
+              </tr>
+            </thead>
+            <tbody id="iterationTableBody" class="divide-y divide-slate-200 dark:divide-slate-800">
+              <tr><td colspan="4" class="py-3 px-3 text-center text-slate-400">Enter inputs to view Newton-Raphson convergence</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Multi-Equation Comparison Table -->
+        <div class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr class="bg-slate-50 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800">
+                <th class="py-2.5 px-3 font-semibold">Correlation / Equation</th>
+                <th class="py-2.5 px-3 font-semibold">Regime</th>
+                <th class="py-2.5 px-3 font-semibold text-right">Darcy <span class="font-mono">f (10 dec)</span></th>
+                <th class="py-2.5 px-3 font-semibold text-right">Fanning <span class="font-mono">f<sub>F</sub> (f/4)</span></th>
+                <th class="py-2.5 px-3 font-semibold text-right">Diff vs. CW</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-200/70 dark:divide-slate-800 font-mono">
+              <tr class="bg-sky-500/5 dark:bg-sky-500/10">
+                <td class="py-2.5 px-3 font-sans font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                  <span class="w-2 h-2 rounded-full bg-sky-500"></span>
+                  <span>Colebrook-White (Python 50-Digit)</span>
+                </td>
+                <td class="py-2.5 px-3 font-sans text-[11px] text-slate-500 dark:text-slate-400">Implicit Turbulent</td>
+                <td id="tblFColebrook" class="py-2.5 px-3 text-right font-bold text-sky-600 dark:text-sky-400">--</td>
+                <td id="tblFanningColebrook" class="py-2.5 px-3 text-right text-slate-600 dark:text-slate-300">--</td>
+                <td class="py-2.5 px-3 text-right text-emerald-600 dark:text-emerald-400">Exact Ref</td>
+              </tr>
+              <tr>
+                <td class="py-2.5 px-3 font-sans font-medium text-slate-700 dark:text-slate-200">Churchill (1977) All-Regime</td>
+                <td class="py-2.5 px-3 font-sans text-[11px] text-slate-500 dark:text-slate-400">All Re (Lam/Trans/Turb)</td>
+                <td id="tblFChurchill" class="py-2.5 px-3 text-right font-semibold">--</td>
+                <td id="tblFanningChurchill" class="py-2.5 px-3 text-right text-slate-500">--</td>
+                <td id="tblErrChurchill" class="py-2.5 px-3 text-right">--</td>
+              </tr>
+              <tr>
+                <td class="py-2.5 px-3 font-sans font-medium text-slate-700 dark:text-slate-200">Swamee-Jain (1976) Explicit</td>
+                <td class="py-2.5 px-3 font-sans text-[11px] text-slate-500 dark:text-slate-400">Re &gt; 4000</td>
+                <td id="tblFSwamee" class="py-2.5 px-3 text-right font-semibold">--</td>
+                <td id="tblFanningSwamee" class="py-2.5 px-3 text-right text-slate-500">--</td>
+                <td id="tblErrSwamee" class="py-2.5 px-3 text-right">--</td>
+              </tr>
+              <tr>
+                <td class="py-2.5 px-3 font-sans font-medium text-slate-700 dark:text-slate-200">Haaland (1983) Explicit</td>
+                <td class="py-2.5 px-3 font-sans text-[11px] text-slate-500 dark:text-slate-400">Re &gt; 4000</td>
+                <td id="tblFHaaland" class="py-2.5 px-3 text-right font-semibold">--</td>
+                <td id="tblFanningHaaland" class="py-2.5 px-3 text-right text-slate-500">--</td>
+                <td id="tblErrHaaland" class="py-2.5 px-3 text-right">--</td>
+              </tr>
+              <tr>
+                <td class="py-2.5 px-3 font-sans font-medium text-slate-700 dark:text-slate-200">Von Kármán (Fully Rough)</td>
+                <td class="py-2.5 px-3 font-sans text-[11px] text-slate-500 dark:text-slate-400">Re → ∞</td>
+                <td id="tblFKarman" class="py-2.5 px-3 text-right font-semibold">--</td>
+                <td id="tblFanningKarman" class="py-2.5 px-3 text-right text-slate-500">--</td>
+                <td id="tblErrKarman" class="py-2.5 px-3 text-right">--</td>
+              </tr>
+              <tr>
+                <td class="py-2.5 px-3 font-sans font-medium text-slate-700 dark:text-slate-200">Hagen-Poiseuille (64/Re)</td>
+                <td class="py-2.5 px-3 font-sans text-[11px] text-slate-500 dark:text-slate-400">Laminar (Re &lt; 2300)</td>
+                <td id="tblFLaminar" class="py-2.5 px-3 text-right font-semibold">--</td>
+                <td id="tblFanningLaminar" class="py-2.5 px-3 text-right text-slate-500">--</td>
+                <td id="tblNoteLaminar" class="py-2.5 px-3 text-right text-slate-400">--</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- TOAST NOTIFICATION BANNER -->
+  <div id="toastBanner" class="fixed bottom-6 right-4 z-50 pointer-events-none opacity-0 translate-y-2 transition-all duration-300 bg-slate-900 dark:bg-sky-500 text-white px-4 py-2.5 rounded-xl shadow-xl border border-slate-700 dark:border-sky-400 text-xs font-semibold flex items-center gap-2">
+    <i class="fa-solid fa-circle-check"></i>
+    <span id="toastMessage">Action completed</span>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- EMBEDDED PYTHON 3.11 + HIGH-PRECISION SOLVER & MOODY CHART ENGINE     -->
+  <!-- ===================================================================== -->
+  <script>
+    /*************************************************************************
+     * 1. EMBEDDED PYTHON 50-DIGIT DECIMAL SOLVER SOURCE CODE (FOR PYODIDE)
+     *************************************************************************/
+    const PYTHON_SOLVER_SOURCE = `
+from decimal import Decimal, getcontext
+import json
+
+# Set 50-digit arbitrary precision (eliminates all floating-point truncation error)
+getcontext().prec = 50
+
+PI_DEC = Decimal("3.14159265358979323846264338327950288419716939937510")
+
+# Exact Unit Conversion Multipliers to Base SI (m, m/s, m3/s, m2/s, Pa.s, kg/m3)
+LEN_TO_M = {
+    "m": Decimal("1"),
+    "mm": Decimal("0.001"),
+    "in": Decimal("0.0254"),
+    "ft": Decimal("0.3048"),
+    "km": Decimal("1000"),
+    "mi": Decimal("1609.344")
+}
+
+VEL_TO_MS = {
+    "m/s": Decimal("1"),
+    "ft/s": Decimal("0.3048")
+}
+
+FLOW_TO_M3S = {
+    "m3/s": Decimal("1"),
+    "L/s": Decimal("0.001"),
+    "m3/h": Decimal("1") / Decimal("3600"),
+    "gpm": Decimal("0.003785411784") / Decimal("60"),
+    "cfs": Decimal("0.3048") ** Decimal("3")
+}
+
+KIN_TO_M2S = {
+    "m2s": Decimal("1"),
+    "mm2s": Decimal("1e-6"),
+    "ft2s": Decimal("0.3048") ** Decimal("2")
+}
+
+DYN_TO_PAS = {
+    "Pas": Decimal("1"),
+    "mPas": Decimal("0.001"),
+    "lbfts": Decimal("1.4881639435695542")
+}
+
+RHO_TO_KGM3 = {
+    "kgm3": Decimal("1"),
+    "lbft3": Decimal("16.01846337396014"),
+    "sg": Decimal("1000")
+}
+
+def solve_full_pipeline_py(payload_json):
+    p = json.loads(payload_json)
+    ln10 = Decimal(10).ln()
+
+    # 1. Exact Reynolds Number Calculation in 50-Digit Decimal
+    if p["reMode"] == "direct":
+        Re = Decimal(p["directReStr"])
+    else:
+        D_m = Decimal(p["diamStr"]) * LEN_TO_M[p["unitDiam"]]
+        area_m2 = (PI_DEC * D_m * D_m) / Decimal("4")
+        if p["flowMode"] == "V":
+            V_ms = Decimal(p["velStr"]) * VEL_TO_MS[p["unitVel"]]
+        else:
+            Q_m3s = Decimal(p["flowStr"]) * FLOW_TO_M3S[p["unitFlow"]]
+            V_ms = Q_m3s / area_m2
+
+        if p["viscMode"] == "kinematic":
+            nu_m2s = Decimal(p["kinStr"]) * KIN_TO_M2S[p["unitKin"]]
+        else:
+            mu_Pas = Decimal(p["dynStr"]) * DYN_TO_PAS[p["unitDyn"]]
+            rho_kgm3 = Decimal(p["rhoStr"]) * RHO_TO_KGM3[p["unitRho"]]
+            nu_m2s = mu_Pas / rho_kgm3
+
+        Re = (V_ms * D_m) / nu_m2s
+
+    # 2. Exact Relative Roughness (e/D) Calculation in 50-Digit Decimal
+    if p["roughMode"] == "rel":
+        rel_rough = Decimal(p["roughRelStr"])
+    else:
+        e_raw = Decimal(p["roughAbsStr"])
+        if e_raw == Decimal("0"):
+            rel_rough = Decimal("0")
+        else:
+            D_m = Decimal(p["diamStr"]) * LEN_TO_M[p["unitDiam"]]
+            e_m = e_raw * LEN_TO_M[p["unitRoughAbs"]]
+            rel_rough = e_m / D_m
+
+    # 3. Colebrook-White Newton-Raphson in 50-Digit Decimal
+    A = rel_rough / Decimal("3.7")
+    B = Decimal("2.51") / Re
+
+    term_h = (rel_rough / Decimal("3.7")) ** Decimal("1.11") + (Decimal("6.9") / Re)
+    x = Decimal("-1.8") * (term_h.ln() / ln10)
+    if x <= Decimal("0"):
+        x = Decimal("7.0")
+
+    iter_log = []
+    for k in range(35):
+        inner = A + B * x
+        g = x + Decimal("2.0") * (inner.ln() / ln10)
+        f_k = Decimal("1") / (x * x)
+        if k < 10:
+            iter_log.append({
+                "step": k,
+                "x": float(x),
+                "f": float(f_k),
+                "residual": float(abs(g))
+            })
+        if abs(g) < Decimal("1e-46") and k > 0:
+            break
+        dgdx = Decimal("1") + (Decimal("2.0") / ln10) * (B / inner)
+        dx = g / dgdx
+        x = x - dx
+        if abs(dx) < Decimal("1e-46") and k > 0:
+            inner_f = A + B * x
+            g_f = x + Decimal("2.0") * (inner_f.ln() / ln10)
+            iter_log.append({
+                "step": k + 1,
+                "x": float(x),
+                "f": float(Decimal("1") / (x * x)),
+                "residual": float(abs(g_f))
+            })
+            break
+
+    f_cw = Decimal("1") / (x * x)
+    final_res = abs(x + Decimal("2.0") * ((A + B * x).ln() / ln10))
+    f_lam = Decimal("64") / Re
+
+    return json.dumps({
+        "re_exact": str(Re.normalize()),
+        "re_float": float(Re),
+        "rel_rough_exact": str(rel_rough.normalize()),
+        "rel_rough_float": float(rel_rough),
+        "f_cw_50": f"{f_cw:.50f}",
+        "f_cw_float": float(f_cw),
+        "f_lam_float": float(f_lam),
+        "residual_str": f"{final_res:.2E}",
+        "iterations": iter_log
+    })
+`.trim();
+
+    let pyodideInstance = null;
+    let pyReady = false;
+
+    async function initPythonEngine() {
+      document.getElementById('pyCodeDisplay').textContent = PYTHON_SOLVER_SOURCE;
+      try {
+        if (typeof loadPyodide === 'undefined') {
+          await new Promise(r => setTimeout(r, 600));
+        }
+        if (typeof loadPyodide !== 'undefined') {
+          pyodideInstance = await loadPyodide({
+            indexURL: "https://cdn.jsdelivr.net/pyodide/v0.25.0/full/"
+          });
+          await pyodideInstance.runPythonAsync(PYTHON_SOLVER_SOURCE);
+          pyReady = true;
+
+          const badge = document.getElementById('pyStatusBadge');
+          const dot = document.getElementById('pyStatusDot');
+          const txt = document.getElementById('pyStatusText');
+          badge.className = 'inline-flex items-center gap-1.5 text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30';
+          dot.className = 'w-1.5 h-1.5 rounded-full bg-emerald-500';
+          txt.textContent = 'Python 3.11 (50-Digit): Ready ●';
+
+          recalculateAll();
+        }
+      } catch (err) {
+        console.warn('Pyodide fallback to IEEE-754:', err);
+        const badge = document.getElementById('pyStatusBadge');
+        const dot = document.getElementById('pyStatusDot');
+        const txt = document.getElementById('pyStatusText');
+        badge.className = 'inline-flex items-center gap-1.5 text-[10px] font-mono px-2 py-0.5 rounded-full bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/30';
+        dot.className = 'w-1.5 h-1.5 rounded-full bg-sky-500';
+        txt.textContent = 'High-Precision IEEE-754 Mode Active';
+      }
+    }
+
+    /*************************************************************************
+     * 2. ASME B36.10M / B36.19M STANDARD PIPE SCHEDULE DATABASE (NPS 1/2" - 36")
+     *    OD and Wall Thickness (wt) stored in exact inches (1 in = 25.4 mm exact)
+     *************************************************************************/
+    const ASME_PIPE_DATABASE = [
+      {
+        nps: '1/2"', dn: 'DN15', od_in: 0.840,
+        schedules: [
+          { sch: 'Sch 5S', wt_in: 0.065 },
+          { sch: 'Sch 10S', wt_in: 0.083 },
+          { sch: 'Sch 40 / STD', wt_in: 0.109 },
+          { sch: 'Sch 80 / XS', wt_in: 0.147 },
+          { sch: 'Sch 160', wt_in: 0.188 },
+          { sch: 'XXS', wt_in: 0.294 }
+        ]
+      },
+      {
+        nps: '3/4"', dn: 'DN20', od_in: 1.050,
+        schedules: [
+          { sch: 'Sch 5S', wt_in: 0.065 },
+          { sch: 'Sch 10S', wt_in: 0.083 },
+          { sch: 'Sch 40 / STD', wt_in: 0.113 },
+          { sch: 'Sch 80 / XS', wt_in: 0.154 },
+          { sch: 'Sch 160', wt_in: 0.219 },
+          { sch: 'XXS', wt_in: 0.308 }
+        ]
+      },
+      {
+        nps: '1"', dn: 'DN25', od_in: 1.315,
+        schedules: [
+          { sch: 'Sch 5S', wt_in: 0.065 },
+          { sch: 'Sch 10S', wt_in: 0.109 },
+          { sch: 'Sch 40 / STD', wt_in: 0.133 },
+          { sch: 'Sch 80 / XS', wt_in: 0.179 },
+          { sch: 'Sch 160', wt_in: 0.250 },
+          { sch: 'XXS', wt_in: 0.358 }
+        ]
+      },
+      {
+        nps: '1-1/4"', dn: 'DN32', od_in: 1.660,
+        schedules: [
+          { sch: 'Sch 5S', wt_in: 0.065 },
+          { sch: 'Sch 10S', wt_in: 0.109 },
+          { sch: 'Sch 40 / STD', wt_in: 0.140 },
+          { sch: 'Sch 80 / XS', wt_in: 0.191 },
+          { sch: 'Sch 160', wt_in: 0.250 },
+          { sch: 'XXS', wt_in: 0.382 }
+        ]
+      },
+      {
+        nps: '1-1/2"', dn: 'DN40', od_in: 1.900,
+        schedules: [
+          { sch: 'Sch 5S', wt_in: 0.065 },
+          { sch: 'Sch 10S', wt_in: 0.109 },
+          { sch: 'Sch 40 / STD', wt_in: 0.145 },
+          { sch: 'Sch 80 / XS', wt_in: 0.200 },
+          { sch: 'Sch 160', wt_in: 0.281 },
+          { sch: 'XXS', wt_in: 0.400 }
+        ]
+      },
+      {
+        nps: '2"', dn: 'DN50', od_in: 2.375,
+        schedules: [
+          { sch: 'Sch 5S', wt_in: 0.065 },
+          { sch: 'Sch 10S', wt_in: 0.109 },
+          { sch: 'Sch 40 / STD', wt_in: 0.154 },
+          { sch: 'Sch 80 / XS', wt_in: 0.218 },
+          { sch: 'Sch 160', wt_in: 0.344 },
+          { sch: 'XXS', wt_in: 0.436 }
+        ]
+      },
+      {
+        nps: '2-1/2"', dn: 'DN65', od_in: 2.875,
+        schedules: [
+          { sch: 'Sch 5S', wt_in: 0.083 },
+          { sch: 'Sch 10S', wt_in: 0.120 },
+          { sch: 'Sch 40 / STD', wt_in: 0.203 },
+          { sch: 'Sch 80 / XS', wt_in: 0.276 },
+          { sch: 'Sch 160', wt_in: 0.375 },
+          { sch: 'XXS', wt_in: 0.552 }
+        ]
+      },
+      {
+        nps: '3"', dn: 'DN80', od_in: 3.500,
+        schedules: [
+          { sch: 'Sch 5S', wt_in: 0.083 },
+          { sch: 'Sch 10S', wt_in: 0.120 },
+          { sch: 'Sch 40 / STD', wt_in: 0.216 },
+          { sch: 'Sch 80 / XS', wt_in: 0.300 },
+          { sch: 'Sch 160', wt_in: 0.438 },
+          { sch: 'XXS', wt_in: 0.600 }
+        ]
+      },
+      {
+        nps: '4"', dn: 'DN100', od_in: 4.500,
+        schedules: [
+          { sch: 'Sch 5S', wt_in: 0.083 },
+          { sch: 'Sch 10S', wt_in: 0.120 },
+          { sch: 'Sch 40 / STD', wt_in: 0.237 },
+          { sch: 'Sch 80 / XS', wt_in: 0.337 },
+          { sch: 'Sch 120', wt_in: 0.438 },
+          { sch: 'Sch 160', wt_in: 0.531 },
+          { sch: 'XXS', wt_in: 0.674 }
+        ]
+      },
+      {
+        nps: '6"', dn: 'DN150', od_in: 6.625,
+        schedules: [
+          { sch: 'Sch 5S', wt_in: 0.109 },
+          { sch: 'Sch 10S', wt_in: 0.134 },
+          { sch: 'Sch 40 / STD', wt_in: 0.280 },
+          { sch: 'Sch 80 / XS', wt_in: 0.432 },
+          { sch: 'Sch 120', wt_in: 0.562 },
+          { sch: 'Sch 160', wt_in: 0.719 },
+          { sch: 'XXS', wt_in: 0.864 }
+        ]
+      },
+      {
+        nps: '8"', dn: 'DN200', od_in: 8.625,
+        schedules: [
+          { sch: 'Sch 5S', wt_in: 0.109 },
+          { sch: 'Sch 10S', wt_in: 0.148 },
+          { sch: 'Sch 20', wt_in: 0.250 },
+          { sch: 'Sch 30', wt_in: 0.277 },
+          { sch: 'Sch 40 / STD', wt_in: 0.322 },
+          { sch: 'Sch 60', wt_in: 0.406 },
+          { sch: 'Sch 80 / XS', wt_in: 0.500 },
+          { sch: 'Sch 100', wt_in: 0.594 },
+          { sch: 'Sch 120', wt_in: 0.719 },
+          { sch: 'Sch 140', wt_in: 0.812 },
+          { sch: 'Sch 160', wt_in: 0.906 },
+          { sch: 'XXS', wt_in: 0.875 }
+        ]
+      },
+      {
+        nps: '10"', dn: 'DN250', od_in: 10.750,
+        schedules: [
+          { sch: 'Sch 5S', wt_in: 0.134 },
+          { sch: 'Sch 10S', wt_in: 0.165 },
+          { sch: 'Sch 20', wt_in: 0.250 },
+          { sch: 'Sch 30', wt_in: 0.307 },
+          { sch: 'Sch 40 / STD', wt_in: 0.365 },
+          { sch: 'Sch 60 / XS', wt_in: 0.500 },
+          { sch: 'Sch 80', wt_in: 0.594 },
+          { sch: 'Sch 100', wt_in: 0.719 },
+          { sch: 'Sch 120', wt_in: 0.844 },
+          { sch: 'Sch 140 / XXS', wt_in: 1.000 },
+          { sch: 'Sch 160', wt_in: 1.125 }
+        ]
+      },
+      {
+        nps: '12"', dn: 'DN300', od_in: 12.750,
+        schedules: [
+          { sch: 'Sch 5S', wt_in: 0.156 },
+          { sch: 'Sch 10S', wt_in: 0.180 },
+          { sch: 'Sch 20', wt_in: 0.250 },
+          { sch: 'Sch 30', wt_in: 0.330 },
+          { sch: 'STD', wt_in: 0.375 },
+          { sch: 'Sch 40', wt_in: 0.406 },
+          { sch: 'XS', wt_in: 0.500 },
+          { sch: 'Sch 60', wt_in: 0.562 },
+          { sch: 'Sch 80', wt_in: 0.688 },
+          { sch: 'Sch 100', wt_in: 0.844 },
+          { sch: 'Sch 120 / XXS', wt_in: 1.000 },
+          { sch: 'Sch 140', wt_in: 1.125 },
+          { sch: 'Sch 160', wt_in: 1.312 }
+        ]
+      },
+      {
+        nps: '14"', dn: 'DN350', od_in: 14.000,
+        schedules: [
+          { sch: 'Sch 10', wt_in: 0.250 },
+          { sch: 'Sch 20', wt_in: 0.312 },
+          { sch: 'Sch 30 / STD', wt_in: 0.375 },
+          { sch: 'Sch 40', wt_in: 0.438 },
+          { sch: 'XS', wt_in: 0.500 },
+          { sch: 'Sch 60', wt_in: 0.594 },
+          { sch: 'Sch 80', wt_in: 0.750 },
+          { sch: 'Sch 100', wt_in: 0.938 },
+          { sch: 'Sch 120', wt_in: 1.094 },
+          { sch: 'Sch 140', wt_in: 1.250 },
+          { sch: 'Sch 160', wt_in: 1.406 }
+        ]
+      },
+      {
+        nps: '16"', dn: 'DN400', od_in: 16.000,
+        schedules: [
+          { sch: 'Sch 10', wt_in: 0.250 },
+          { sch: 'Sch 20', wt_in: 0.312 },
+          { sch: 'Sch 30 / STD', wt_in: 0.375 },
+          { sch: 'Sch 40 / XS', wt_in: 0.500 },
+          { sch: 'Sch 60', wt_in: 0.656 },
+          { sch: 'Sch 80', wt_in: 0.844 },
+          { sch: 'Sch 100', wt_in: 1.031 },
+          { sch: 'Sch 120', wt_in: 1.219 },
+          { sch: 'Sch 140', wt_in: 1.438 },
+          { sch: 'Sch 160', wt_in: 1.594 }
+        ]
+      },
+      {
+        nps: '18"', dn: 'DN450', od_in: 18.000,
+        schedules: [
+          { sch: 'Sch 10', wt_in: 0.250 },
+          { sch: 'Sch 20', wt_in: 0.312 },
+          { sch: 'STD', wt_in: 0.375 },
+          { sch: 'Sch 30', wt_in: 0.438 },
+          { sch: 'XS', wt_in: 0.500 },
+          { sch: 'Sch 40', wt_in: 0.562 },
+          { sch: 'Sch 60', wt_in: 0.750 },
+          { sch: 'Sch 80', wt_in: 0.938 },
+          { sch: 'Sch 100', wt_in: 1.156 },
+          { sch: 'Sch 120', wt_in: 1.375 },
+          { sch: 'Sch 140', wt_in: 1.562 },
+          { sch: 'Sch 160', wt_in: 1.781 }
+        ]
+      },
+      {
+        nps: '20"', dn: 'DN500', od_in: 20.000,
+        schedules: [
+          { sch: 'Sch 10', wt_in: 0.250 },
+          { sch: 'Sch 20 / STD', wt_in: 0.375 },
+          { sch: 'Sch 30 / XS', wt_in: 0.500 },
+          { sch: 'Sch 40', wt_in: 0.594 },
+          { sch: 'Sch 60', wt_in: 0.812 },
+          { sch: 'Sch 80', wt_in: 1.031 },
+          { sch: 'Sch 100', wt_in: 1.281 },
+          { sch: 'Sch 120', wt_in: 1.500 },
+          { sch: 'Sch 140', wt_in: 1.750 },
+          { sch: 'Sch 160', wt_in: 1.969 }
+        ]
+      },
+      {
+        nps: '24"', dn: 'DN600', od_in: 24.000,
+        schedules: [
+          { sch: 'Sch 10', wt_in: 0.250 },
+          { sch: 'Sch 20 / STD', wt_in: 0.375 },
+          { sch: 'XS', wt_in: 0.500 },
+          { sch: 'Sch 30', wt_in: 0.562 },
+          { sch: 'Sch 40', wt_in: 0.688 },
+          { sch: 'Sch 60', wt_in: 0.969 },
+          { sch: 'Sch 80', wt_in: 1.219 },
+          { sch: 'Sch 100', wt_in: 1.531 },
+          { sch: 'Sch 120', wt_in: 1.812 },
+          { sch: 'Sch 140', wt_in: 2.062 },
+          { sch: 'Sch 160', wt_in: 2.344 }
+        ]
+      },
+      {
+        nps: '30"', dn: 'DN750', od_in: 30.000,
+        schedules: [
+          { sch: 'Sch 5S', wt_in: 0.250 },
+          { sch: 'Sch 10', wt_in: 0.312 },
+          { sch: 'STD', wt_in: 0.375 },
+          { sch: 'Sch 20 / XS', wt_in: 0.500 },
+          { sch: 'Sch 30', wt_in: 0.625 }
+        ]
+      },
+      {
+        nps: '36"', dn: 'DN900', od_in: 36.000,
+        schedules: [
+          { sch: 'Sch 10', wt_in: 0.312 },
+          { sch: 'STD', wt_in: 0.375 },
+          { sch: 'Sch 20 / XS', wt_in: 0.500 },
+          { sch: 'Sch 30', wt_in: 0.625 },
+          { sch: 'Sch 40', wt_in: 0.750 }
+        ]
+      }
+    ];
+
+    /*************************************************************************
+     * 2B. INDUSTRIAL FLUID PROPERTY PRESET DATABASE (CANONICAL SI UNITS)
+     *     rho_kgm3: kg/m³, mu_Pas: Pa·s (1 cP = 0.001 Pa·s), nu_m2s = mu / rho
+     *************************************************************************/
+    const FLUID_PRESET_DATABASE = {
+      water20: {
+        name: 'Water @ 20°C',
+        rho_kgm3: 998.2,
+        mu_Pas: 0.001002,
+        nu_m2s: 0.001002 / 998.2
+      },
+      water40: {
+        name: 'Water @ 40°C',
+        rho_kgm3: 992.2,
+        mu_Pas: 0.000653,
+        nu_m2s: 0.000653 / 992.2
+      },
+      water80: {
+        name: 'Water @ 80°C',
+        rho_kgm3: 971.8,
+        mu_Pas: 0.000355,
+        nu_m2s: 0.000355 / 971.8
+      },
+      seawater20: {
+        name: 'Seawater 3.5% @ 20°C',
+        rho_kgm3: 1025.0,
+        mu_Pas: 0.001070,
+        nu_m2s: 0.001070 / 1025.0
+      },
+      h2so4_98_20: {
+        name: 'Sulfuric Acid (H₂SO₄) 98.5% @ 20°C',
+        rho_kgm3: 1836.0,
+        mu_Pas: 0.02450,
+        nu_m2s: 0.02450 / 1836.0
+      },
+      h2so4_98_40: {
+        name: 'Sulfuric Acid (H₂SO₄) 98.5% @ 40°C',
+        rho_kgm3: 1816.0,
+        mu_Pas: 0.01420,
+        nu_m2s: 0.01420 / 1816.0
+      },
+      h2so4_93_20: {
+        name: 'Sulfuric Acid (H₂SO₄) 93% @ 20°C',
+        rho_kgm3: 1828.0,
+        mu_Pas: 0.02180,
+        nu_m2s: 0.02180 / 1828.0
+      },
+      h3po4_54_40: {
+        name: 'Phosphoric Acid (54% P₂O₅) @ 40°C',
+        rho_kgm3: 1620.0,
+        mu_Pas: 0.01850,
+        nu_m2s: 0.01850 / 1620.0
+      },
+      h3po4_85_20: {
+        name: 'Phosphoric Acid (H₃PO₄) 85% @ 20°C',
+        rho_kgm3: 1685.0,
+        mu_Pas: 0.04700,
+        nu_m2s: 0.04700 / 1685.0
+      },
+      hcl_32_20: {
+        name: 'Hydrochloric Acid (HCl) 32% @ 20°C',
+        rho_kgm3: 1159.0,
+        mu_Pas: 0.00190,
+        nu_m2s: 0.00190 / 1159.0
+      },
+      naoh_50_20: {
+        name: 'Sodium Hydroxide (NaOH) 50% @ 20°C',
+        rho_kgm3: 1525.0,
+        mu_Pas: 0.07800,
+        nu_m2s: 0.07800 / 1525.0
+      },
+      nh3_liq_20: {
+        name: 'Liquid Ammonia (NH₃ Sat.) @ 20°C',
+        rho_kgm3: 610.3,
+        mu_Pas: 0.000141,
+        nu_m2s: 0.000141 / 610.3
+      },
+      coating_oil_60: {
+        name: 'Coating / Process Oil @ 60°C',
+        rho_kgm3: 875.0,
+        mu_Pas: 0.03200,
+        nu_m2s: 0.03200 / 875.0
+      },
+      iso_vg46_40: {
+        name: 'Hydraulic Oil ISO VG 46 @ 40°C',
+        rho_kgm3: 870.0,
+        mu_Pas: 0.04002,
+        nu_m2s: 0.000046
+      },
+      iso_vg68_40: {
+        name: 'Lubricating Oil ISO VG 68 @ 40°C',
+        rho_kgm3: 876.0,
+        mu_Pas: 0.059568,
+        nu_m2s: 0.000068
+      },
+      sae30_20: {
+        name: 'SAE 30 Engine Oil @ 20°C',
+        rho_kgm3: 891.0,
+        mu_Pas: 0.2900,
+        nu_m2s: 0.2900 / 891.0
+      },
+      diesel_20: {
+        name: 'Diesel Fuel @ 20°C',
+        rho_kgm3: 832.0,
+        mu_Pas: 0.00300,
+        nu_m2s: 0.00300 / 832.0
+      },
+      hfo_50: {
+        name: 'Heavy Fuel Oil / Bunker C @ 50°C',
+        rho_kgm3: 960.0,
+        mu_Pas: 0.3800,
+        nu_m2s: 0.3800 / 960.0
+      },
+      glycol50_20: {
+        name: 'Ethylene Glycol 50% @ 20°C',
+        rho_kgm3: 1065.0,
+        mu_Pas: 0.00380,
+        nu_m2s: 0.00380 / 1065.0
+      },
+      air20: {
+        name: 'Air @ 20°C, 1 atm',
+        rho_kgm3: 1.204,
+        mu_Pas: 0.00001825,
+        nu_m2s: 0.00001825 / 1.204
+      }
+    };
+
+    /*************************************************************************
+     * 3. APPLICATION STATE & CORRELATIONS
+     *************************************************************************/
+    const STANDARD_REL_ROUGHNESS = [
+      0.05, 0.03, 0.02, 0.015, 0.01, 0.005, 0.002, 0.001, 0.0005, 0.0002, 0.0001, 0.00005, 0.00001
+    ];
+
+    const state = {
+      unitPreset: 'SI_BASE',   // 'SI_BASE', 'SI_ENG', or 'US'
+      reMode: 'calc',          // 'calc' or 'direct'
+      pipeSelectMode: 'manual',// 'manual' or 'schedule'
+      flowMode: 'V',           // 'V' or 'Q'
+      viscMode: 'kinematic',   // 'kinematic' or 'dynamic'
+      roughMode: 'abs',        // 'abs' or 'rel'
+      chartTouchMode: 'inspect',
+      isFullscreen: false,
+
+      valid: false,
+      D_m: null,
+      area_m2: null,
+      V_ms: null,
+      Q_m3s: null,
+      rho_kgm3: null,
+      nu_m2s: null,
+      Re: null,
+      relRoughness: null,
+      L_m: null,
+
+      re_exact_str: '',
+      rel_rough_exact_str: '',
+      f_cw_50_str: '',
+      residual_str: '',
+
+      f_active: null,
+      f_colebrook: null,
+      f_churchill: null,
+      f_haaland: null,
+      f_swamee: null,
+      f_karman: null,
+      f_laminar: null,
+      iterations: [],
+      regime: '',
+      subRegime: '',
+
+      headLoss_m: null,
+      pressureDrop_Pa: null,
+      velHead_m: null,
+      wallShear_Pa: null,
+
+      probeActive: false,
+      probeRe: null,
+      probeF: null,
+      probeRelRough: null
+    };
+
+    let moodyCurveCache = null;
+
+    // Unit conversion multipliers in JS (for instant UI subtexts & fallback)
+    const JS_LEN_TO_M = { m: 1.0, mm: 0.001, in: 0.0254, ft: 0.3048, km: 1000.0, mi: 1609.344 };
+    const JS_VEL_TO_MS = { 'm/s': 1.0, 'ft/s': 0.3048 };
+    const JS_FLOW_TO_M3S = {
+      'm3/s': 1.0,
+      'L/s': 0.001,
+      'm3/h': 1.0 / 3600.0,
+      'gpm': 0.003785411784 / 60.0,
+      'cfs': Math.pow(0.3048, 3)
+    };
+    const JS_KIN_TO_M2S = { m2s: 1.0, mm2s: 1e-6, ft2s: Math.pow(0.3048, 2) };
+    const JS_DYN_TO_PAS = { Pas: 1.0, mPas: 0.001, lbfts: 1.4881639435695542 };
+    const JS_RHO_TO_KGM3 = { kgm3: 1.0, lbft3: 16.01846337396014, sg: 1000.0 };
+
+    function calcHaaland(Re, relRough) {
+      if (Re <= 0) return 0.02;
+      const term = Math.pow(Math.max(0, relRough) / 3.7, 1.11) + (6.9 / Re);
+      if (term <= 0) return 0.008;
+      const invSqrtF = -1.8 * Math.log10(term);
+      return 1.0 / (invSqrtF * invSqrtF);
+    }
+
+    function calcSwameeJain(Re, relRough) {
+      if (Re <= 0) return 0.02;
+      const term = (Math.max(0, relRough) / 3.7) + (5.74 / Math.pow(Re, 0.9));
+      if (term <= 0) return 0.008;
+      const denom = Math.log10(term);
+      return 0.25 / (denom * denom);
+    }
+
+    function calcChurchill(Re, relRough) {
+      if (Re <= 0) return 0;
+      const rr = Math.max(0, relRough);
+      const termA = Math.pow(7.0 / Re, 0.9) + 0.27 * rr;
+      const A = Math.pow(-2.457 * Math.log(termA), 16);
+      const B = Math.pow(37530.0 / Re, 16);
+      return 8.0 * Math.pow(Math.pow(8.0 / Re, 12) + 1.0 / Math.pow(A + B, 1.5), 1.0 / 12.0);
+    }
+
+    function calcVonKarman(relRough) {
+      if (relRough <= 1e-12) return null;
+      const invSqrtF = -2.0 * Math.log10(relRough / 3.7);
+      return 1.0 / (invSqrtF * invSqrtF);
+    }
+
+    function solveColebrookWhiteJS(Re, relRough, recordLog = false) {
+      const safeRe = Math.max(Re, 10);
+      const safeRough = Math.max(0, relRough);
+      const f0 = calcHaaland(safeRe, safeRough);
+      let x = 1.0 / Math.sqrt(f0);
+
+      const LN10 = Math.LN10;
+      const A = safeRough / 3.7;
+      const B = 2.51 / safeRe;
+
+      const iterLog = [];
+      for (let k = 0; k < 30; k++) {
+        const inner = A + B * x;
+        const g = x + 2.0 * (Math.log(inner) / LN10);
+        const fVal = 1.0 / (x * x);
+
+        if (recordLog) {
+          iterLog.push({ step: k, x: x, f: fVal, residual: Math.abs(g) });
+        }
+        if (Math.abs(g) <= 1e-15 && k > 0) break;
+
+        const dgdx = 1.0 + (2.0 / LN10) * (B / inner);
+        const dx = g / dgdx;
+        x = x - dx;
+
+        if (Math.abs(dx) <= 1e-15 && k > 0) {
+          if (recordLog) {
+            const innerFinal = A + B * x;
+            const gFinal = x + 2.0 * (Math.log(innerFinal) / LN10);
+            iterLog.push({ step: k + 1, x: x, f: 1.0 / (x * x), residual: Math.abs(gFinal) });
+          }
+          break;
+        }
+      }
+      const fFinal = 1.0 / (x * x);
+      const resFinal = Math.abs(x + 2.0 * (Math.log(A + B * x) / LN10));
+      return { f: fFinal, iterations: iterLog, residual: resFinal };
+    }
+
+    function inferRelRoughnessFromReAndF(Re, f) {
+      if (Re <= 0 || f <= 0) return 0;
+      const invSqrtF = 1.0 / Math.sqrt(f);
+      const lhs = Math.pow(10, -0.5 * invSqrtF);
+      const viscousTerm = (2.51 * invSqrtF) / Re;
+      const roughTerm = lhs - viscousTerm;
+      if (roughTerm <= 0) return 0;
+      return Math.min(0.05, roughTerm * 3.7);
+    }
+
+    /*************************************************************************
+     * 4. ASME PIPE SCHEDULE SELECTOR LOGIC
+     *************************************************************************/
+    function initPipeScheduleDropdowns() {
+      const npsSelect = document.getElementById('selectPipeNPS');
+      npsSelect.innerHTML = ASME_PIPE_DATABASE.map((item, idx) =>
+        `<option value="${idx}" ${item.nps === '12"' ? 'selected' : ''}>NPS ${item.nps} (${item.dn})</option>`
+      ).join('');
+      populateScheduleOptionsForNPS(npsSelect.value, 'STD');
+    }
+
+    function populateScheduleOptionsForNPS(npsIdx, preferredSch = 'Sch 40 / STD') {
+      const pipeObj = ASME_PIPE_DATABASE[npsIdx];
+      if (!pipeObj) return;
+      const schSelect = document.getElementById('selectPipeSch');
+
+      let defaultIdx = pipeObj.schedules.findIndex(s => s.sch.includes('40') || s.sch.includes('STD'));
+      if (defaultIdx === -1) defaultIdx = 0;
+
+      schSelect.innerHTML = pipeObj.schedules.map((s, idx) => {
+        const id_in = pipeObj.od_in - 2.0 * s.wt_in;
+        const id_mm = id_in * 25.4;
+        return `<option value="${idx}" ${idx === defaultIdx ? 'selected' : ''}>${s.sch} — ID: ${id_mm.toFixed(2)} mm (${id_in.toFixed(3)}")</option>`;
+      }).join('');
+    }
+
+    function setPipeSelectMode(mode) {
+      state.pipeSelectMode = mode;
+      const btnManual = document.getElementById('btnDiamManual');
+      const btnStd = document.getElementById('btnDiamStd');
+      const boxStd = document.getElementById('boxPipeScheduleSelector');
+      const lblSource = document.getElementById('labelDiameterSource');
+
+      if (mode === 'manual') {
+        btnManual.className = 'px-2 py-0.5 rounded font-semibold bg-white dark:bg-slate-800 text-sky-600 dark:text-sky-400 shadow-sm';
+        btnStd.className = 'px-2 py-0.5 rounded font-semibold text-slate-600 dark:text-slate-400';
+        boxStd.classList.add('hidden');
+        lblSource.innerHTML = 'Enter internal diameter <span class="font-mono">D</span>';
+      } else {
+        btnStd.className = 'px-2 py-0.5 rounded font-semibold bg-white dark:bg-slate-800 text-sky-600 dark:text-sky-400 shadow-sm';
+        btnManual.className = 'px-2 py-0.5 rounded font-semibold text-slate-600 dark:text-slate-400';
+        boxStd.classList.remove('hidden');
+        applySelectedPipeScheduleToDiameter();
+      }
+      recalculateAll();
+    }
+
+    function onNPSChange() {
+      const npsIdx = parseInt(document.getElementById('selectPipeNPS').value, 10);
+      populateScheduleOptionsForNPS(npsIdx);
+      applySelectedPipeScheduleToDiameter();
+      recalculateAll();
+    }
+
+    function onScheduleChange() {
+      applySelectedPipeScheduleToDiameter();
+      recalculateAll();
+    }
+
+    function applySelectedPipeScheduleToDiameter() {
+      const npsIdx = parseInt(document.getElementById('selectPipeNPS').value, 10);
+      const schIdx = parseInt(document.getElementById('selectPipeSch').value, 10);
+      const pipeObj = ASME_PIPE_DATABASE[npsIdx];
+      if (!pipeObj || !pipeObj.schedules[schIdx]) return;
+
+      const schObj = pipeObj.schedules[schIdx];
+      const od_in = pipeObj.od_in;
+      const wt_in = schObj.wt_in;
+      const id_in = Number((od_in - 2.0 * wt_in).toFixed(6));
+
+      const od_mm = Number((od_in * 25.4).toFixed(4));
+      const wt_mm = Number((wt_in * 25.4).toFixed(4));
+      const id_mm = Number((id_in * 25.4).toFixed(4));
+      const id_m = Number((id_mm / 1000.0).toFixed(7));
+
+      // Update Spec Summary Badge
+      const summaryEl = document.getElementById('pipeSpecSummary');
+      summaryEl.innerHTML = `
+        <span>OD: <strong>${od_mm.toFixed(2)} mm</strong> (${od_in.toFixed(3)}")</span>
+        <span>WT: <strong>${wt_mm.toFixed(2)} mm</strong> (${wt_in.toFixed(3)}")</span>
+        <span class="text-sky-600 dark:text-sky-300 font-bold">ID: ${id_mm.toFixed(2)} mm | ${id_m} m | ${id_in.toFixed(3)}"</span>
+      `;
+
+      // Populate Diameter Input in the user's currently selected unit
+      const unitD = document.getElementById('unitDiameter').value;
+      let dVal = id_m;
+      if (unitD === 'mm') dVal = id_mm;
+      else if (unitD === 'in') dVal = id_in;
+      else if (unitD === 'ft') dVal = Number((id_in / 12.0).toPrecision(8));
+
+      document.getElementById('inputDiameter').value = String(dVal);
+      document.getElementById('labelDiameterSource').innerHTML =
+        `Auto-filled from <strong>NPS ${pipeObj.nps} (${pipeObj.dn}) ${schObj.sch}</strong>`;
+    }
+
+    function onDiameterUnitChange() {
+      if (state.pipeSelectMode === 'schedule') {
+        applySelectedPipeScheduleToDiameter();
+      }
+      recalculateAll();
+    }
+
+    function onManualDiameterEdit() {
+      if (state.pipeSelectMode === 'schedule') {
+        document.getElementById('labelDiameterSource').innerHTML =
+          `Custom ID edited manually`;
+      }
+      recalculateAll();
+    }
+
+    function applyMaterialRoughnessPreset(mmValStr) {
+      if (mmValStr === 'custom') return;
+      const mmVal = parseFloat(mmValStr);
+      if (isNaN(mmVal)) return;
+
+      const unitEps = document.getElementById('unitRoughnessAbs').value;
+      let converted = mmVal;
+      if (unitEps === 'm') converted = Number((mmVal * 1e-3).toPrecision(8));
+      else if (unitEps === 'mm') converted = mmVal;
+      else if (unitEps === 'in') converted = Number((mmVal / 25.4).toPrecision(6));
+      else if (unitEps === 'ft') converted = Number((mmVal / 304.8).toPrecision(6));
+
+      document.getElementById('inputRoughnessAbs').value = String(converted);
+      recalculateAll();
+    }
+
+    function onRoughnessUnitChange() {
+      const presetVal = document.getElementById('selectRoughMaterial').value;
+      if (presetVal !== 'custom') {
+        applyMaterialRoughnessPreset(presetVal);
+      } else {
+        recalculateAll();
+      }
+    }
+
+    function onManualRoughnessEdit() {
+      document.getElementById('selectRoughMaterial').value = 'custom';
+      recalculateAll();
+    }
+
+    /*************************************************************************
+     * 4B. FLUID PROPERTY PRESET HANDLERS
+     *************************************************************************/
+    function applyFluidPreset(presetKey) {
+      const badge = document.getElementById('fluidPresetSummaryBadge');
+      const tag = document.getElementById('fluidPresetTag');
+
+      if (!presetKey || presetKey === 'custom' || !FLUID_PRESET_DATABASE[presetKey]) {
+        badge.classList.add('hidden');
+        tag.textContent = 'Manual / Custom';
+        recalculateAll();
+        return;
+      }
+
+      const fl = FLUID_PRESET_DATABASE[presetKey];
+      tag.textContent = fl.name;
+
+      // Convert canonical SI fluid properties into the user's currently selected units
+      const unitKin = document.getElementById('unitKinVisc').value;
+      const unitDyn = document.getElementById('unitDynVisc').value;
+      const unitRho = document.getElementById('unitDensity').value;
+
+      const nuConverted = Number((fl.nu_m2s / JS_KIN_TO_M2S[unitKin]).toPrecision(7));
+      const muConverted = Number((fl.mu_Pas / JS_DYN_TO_PAS[unitDyn]).toPrecision(7));
+      const rhoConverted = Number((fl.rho_kgm3 / JS_RHO_TO_KGM3[unitRho]).toPrecision(7));
+
+      document.getElementById('inputKinVisc').value = String(nuConverted);
+      document.getElementById('inputDynVisc').value = String(muConverted);
+      document.getElementById('inputDensity').value = String(rhoConverted);
+      document.getElementById('inputDensityOpt').value = String(rhoConverted);
+      document.getElementById('unitDensityOpt').value = unitRho;
+
+      const mu_cP = Number((fl.mu_Pas * 1000.0).toPrecision(5));
+      const nu_cSt = Number((fl.nu_m2s * 1e6).toPrecision(5));
+      badge.classList.remove('hidden');
+      badge.innerHTML = `
+        <span>ρ = <strong>${fl.rho_kgm3} kg/m³</strong></span>
+        <span>μ = <strong>${mu_cP} cP</strong> (${fl.mu_Pas.toExponential(3)} Pa·s)</span>
+        <span>ν = <strong>${nu_cSt} cSt</strong> (${fl.nu_m2s.toExponential(4)} m²/s)</span>
+      `;
+
+      recalculateAll();
+    }
+
+    function onManualFluidInputEdit() {
+      document.getElementById('selectFluidPreset').value = 'custom';
+      document.getElementById('fluidPresetSummaryBadge').classList.add('hidden');
+      document.getElementById('fluidPresetTag').textContent = 'Manual / Custom';
+      recalculateAll();
+    }
+
+    function onKinViscUnitChange() {
+      const presetKey = document.getElementById('selectFluidPreset').value;
+      if (presetKey !== 'custom') {
+        applyFluidPreset(presetKey);
+      } else {
+        recalculateAll();
+      }
+    }
+
+    function onDynViscUnitChange() {
+      const presetKey = document.getElementById('selectFluidPreset').value;
+      if (presetKey !== 'custom') {
+        applyFluidPreset(presetKey);
+      } else {
+        recalculateAll();
+      }
+    }
+
+    /*************************************************************************
+     * 5. GLOBAL UNIT SYSTEM PRESET SWITCHER (SI_BASE, SI_ENG, US IMPERIAL)
+     *************************************************************************/
+    function applyUnitSystemPreset(preset) {
+      state.unitPreset = preset;
+      const btnSI = document.getElementById('btnSysSI');
+      const btnMetric = document.getElementById('btnSysMetric');
+      const btnUS = document.getElementById('btnSysUS');
+
+      const activeClass = 'px-2 py-1 rounded-md font-semibold transition-all bg-white dark:bg-slate-900 text-sky-600 dark:text-sky-400 shadow-sm';
+      const inactiveClass = 'px-2 py-1 rounded-md font-semibold transition-all text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white';
+
+      btnSI.className = preset === 'SI_BASE' ? activeClass : inactiveClass;
+      btnMetric.className = (preset === 'SI_ENG' ? activeClass : inactiveClass) + ' hidden sm:inline-block';
+      btnUS.className = preset === 'US' ? activeClass : inactiveClass;
+
+      if (preset === 'SI_BASE') {
+        document.getElementById('unitVelocity').value = 'm/s';
+        document.getElementById('unitFlowRate').value = 'm3/s';
+        document.getElementById('unitDiameter').value = 'm';
+        document.getElementById('unitKinVisc').value = 'm2s';
+        document.getElementById('unitDynVisc').value = 'Pas';
+        document.getElementById('unitDensity').value = 'kgm3';
+        document.getElementById('unitDensityOpt').value = 'kgm3';
+        document.getElementById('unitRoughnessAbs').value = 'm';
+        document.getElementById('unitLength').value = 'm';
+      } else if (preset === 'SI_ENG') {
+        document.getElementById('unitVelocity').value = 'm/s';
+        document.getElementById('unitFlowRate').value = 'L/s';
+        document.getElementById('unitDiameter').value = 'mm';
+        document.getElementById('unitKinVisc').value = 'mm2s';
+        document.getElementById('unitDynVisc').value = 'mPas';
+        document.getElementById('unitDensity').value = 'kgm3';
+        document.getElementById('unitDensityOpt').value = 'kgm3';
+        document.getElementById('unitRoughnessAbs').value = 'mm';
+        document.getElementById('unitLength').value = 'm';
+      } else if (preset === 'US') {
+        document.getElementById('unitVelocity').value = 'ft/s';
+        document.getElementById('unitFlowRate').value = 'gpm';
+        document.getElementById('unitDiameter').value = 'in';
+        document.getElementById('unitKinVisc').value = 'ft2s';
+        document.getElementById('unitDynVisc').value = 'mPas';
+        document.getElementById('unitDensity').value = 'lbft3';
+        document.getElementById('unitDensityOpt').value = 'lbft3';
+        document.getElementById('unitRoughnessAbs').value = 'ft';
+        document.getElementById('unitLength').value = 'ft';
+      }
+
+      if (state.pipeSelectMode === 'schedule') {
+        applySelectedPipeScheduleToDiameter();
+      }
+      const matPreset = document.getElementById('selectRoughMaterial').value;
+      if (matPreset !== 'custom') {
+        applyMaterialRoughnessPreset(matPreset);
+      }
+      const fluidPreset = document.getElementById('selectFluidPreset').value;
+      if (fluidPreset !== 'custom') {
+        applyFluidPreset(fluidPreset);
+      }
+
+      recalculateAll();
+    }
+
+    /*************************************************************************
+     * 6. UI MODE SWITCHERS
+     *************************************************************************/
+    function setReMode(mode) {
+      state.reMode = mode;
+      const btnCalc = document.getElementById('btnReModeCalc');
+      const btnDirect = document.getElementById('btnReModeDirect');
+      const panelCalc = document.getElementById('panelReCalc');
+      const panelDirect = document.getElementById('panelReDirect');
+
+      if (mode === 'calc') {
+        btnCalc.className = 'px-2.5 py-1 rounded-md font-semibold bg-white dark:bg-slate-900 text-sky-600 dark:text-sky-400 shadow-sm transition';
+        btnDirect.className = 'px-2.5 py-1 rounded-md font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition';
+        panelCalc.classList.remove('hidden');
+        panelDirect.classList.add('hidden');
+      } else {
+        btnDirect.className = 'px-2.5 py-1 rounded-md font-semibold bg-white dark:bg-slate-900 text-sky-600 dark:text-sky-400 shadow-sm transition';
+        btnCalc.className = 'px-2.5 py-1 rounded-md font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition';
+        panelDirect.classList.remove('hidden');
+        panelCalc.classList.add('hidden');
+      }
+      recalculateAll();
+    }
+
+    function setFlowMode(mode) {
+      state.flowMode = mode;
+      const btnV = document.getElementById('btnFlowV');
+      const btnQ = document.getElementById('btnFlowQ');
+      const boxV = document.getElementById('boxFlowV');
+      const boxQ = document.getElementById('boxFlowQ');
+
+      if (mode === 'V') {
+        btnV.className = 'px-2 py-0.5 rounded font-semibold bg-white dark:bg-slate-800 text-sky-600 dark:text-sky-400 shadow-sm';
+        btnQ.className = 'px-2 py-0.5 rounded font-semibold text-slate-600 dark:text-slate-400';
+        boxV.classList.remove('hidden');
+        boxQ.classList.add('hidden');
+      } else {
+        btnQ.className = 'px-2 py-0.5 rounded font-semibold bg-white dark:bg-slate-800 text-sky-600 dark:text-sky-400 shadow-sm';
+        btnV.className = 'px-2 py-0.5 rounded font-semibold text-slate-600 dark:text-slate-400';
+        boxQ.classList.remove('hidden');
+        boxV.classList.add('hidden');
+      }
+      recalculateAll();
+    }
+
+    function setViscMode(mode) {
+      state.viscMode = mode;
+      const btnKin = document.getElementById('btnViscKinematic');
+      const btnDyn = document.getElementById('btnViscDynamic');
+      const boxKin = document.getElementById('boxKinematicVisc');
+      const boxDyn = document.getElementById('boxDynamicVisc');
+
+      if (mode === 'kinematic') {
+        btnKin.className = 'px-2 py-0.5 rounded font-semibold bg-white dark:bg-slate-800 text-sky-600 dark:text-sky-400 shadow-sm';
+        btnDyn.className = 'px-2 py-0.5 rounded font-semibold text-slate-600 dark:text-slate-400';
+        boxKin.classList.remove('hidden');
+        boxDyn.classList.add('hidden');
+      } else {
+        btnDyn.className = 'px-2 py-0.5 rounded font-semibold bg-white dark:bg-slate-800 text-sky-600 dark:text-sky-400 shadow-sm';
+        btnKin.className = 'px-2 py-0.5 rounded font-semibold text-slate-600 dark:text-slate-400';
+        boxDyn.classList.remove('hidden');
+        boxKin.classList.add('hidden');
+      }
+      recalculateAll();
+    }
+
+    function setRoughnessMode(mode) {
+      state.roughMode = mode;
+      const btnAbs = document.getElementById('btnRoughAbs');
+      const btnRel = document.getElementById('btnRoughRel');
+      const panelAbs = document.getElementById('panelRoughAbs');
+      const panelRel = document.getElementById('panelRoughRel');
+
+      if (mode === 'abs') {
+        btnAbs.className = 'px-2.5 py-1 rounded-md font-semibold bg-white dark:bg-slate-900 text-amber-600 dark:text-amber-400 shadow-sm transition';
+        btnRel.className = 'px-2.5 py-1 rounded-md font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition';
+        panelAbs.classList.remove('hidden');
+        panelRel.classList.add('hidden');
+      } else {
+        btnRel.className = 'px-2.5 py-1 rounded-md font-semibold bg-white dark:bg-slate-900 text-amber-600 dark:text-amber-400 shadow-sm transition';
+        btnAbs.className = 'px-2.5 py-1 rounded-md font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition';
+        panelRel.classList.remove('hidden');
+        panelAbs.classList.add('hidden');
+      }
+      recalculateAll();
+    }
+
+    function onMainDensityEdit(val) {
+      document.getElementById('inputDensityOpt').value = val;
+      onManualFluidInputEdit();
+    }
+
+    function onMainDensityUnitChange() {
+      document.getElementById('unitDensityOpt').value = document.getElementById('unitDensity').value;
+      const presetKey = document.getElementById('selectFluidPreset').value;
+      if (presetKey !== 'custom') {
+        applyFluidPreset(presetKey);
+      } else {
+        recalculateAll();
+      }
+    }
+
+    function onOptDensityChange(val) {
+      document.getElementById('inputDensity').value = val;
+      recalculateAll();
+    }
+
+    function onOptDensityUnitChange() {
+      document.getElementById('unitDensity').value = document.getElementById('unitDensityOpt').value;
+      const presetKey = document.getElementById('selectFluidPreset').value;
+      if (presetKey !== 'custom') {
+        applyFluidPreset(presetKey);
+      } else {
+        recalculateAll();
+      }
+    }
+
+    /*************************************************************************
+     * 7. MASTER CALCULATION PIPELINE (EXECUTES PYTHON 50-DIGIT DECIMAL)
+     *************************************************************************/
+    function getCleanNumericString(id, allowZero = false) {
+      const raw = document.getElementById(id).value.trim().replace(/,/g, '');
+      if (raw === '') return null;
+      const val = Number(raw);
+      if (!isFinite(val)) return null;
+      if (allowZero ? val < 0 : val <= 0) return null;
+      return raw;
+    }
+
+    function recalculateAll() {
+      const g = 9.80665;
+
+      state.valid = false;
+      state.D_m = null;
+      state.area_m2 = null;
+      state.V_ms = null;
+      state.Q_m3s = null;
+      state.rho_kgm3 = null;
+      state.nu_m2s = null;
+      state.Re = null;
+      state.relRoughness = null;
+      state.L_m = null;
+      state.headLoss_m = null;
+      state.pressureDrop_Pa = null;
+      state.velHead_m = null;
+      state.wallShear_Pa = null;
+
+      // Read raw input strings (never truncated!)
+      const diamStr = getCleanNumericString('inputDiameter', false);
+      const unitDiam = document.getElementById('unitDiameter').value;
+
+      const velStr = getCleanNumericString('inputVelocity', false);
+      const unitVel = document.getElementById('unitVelocity').value;
+
+      const flowStr = getCleanNumericString('inputFlowRate', false);
+      const unitFlow = document.getElementById('unitFlowRate').value;
+
+      const kinStr = getCleanNumericString('inputKinVisc', false);
+      const unitKin = document.getElementById('unitKinVisc').value;
+
+      const dynStr = getCleanNumericString('inputDynVisc', false);
+      const unitDyn = document.getElementById('unitDynVisc').value;
+
+      const rhoStr = getCleanNumericString('inputDensity', false) || getCleanNumericString('inputDensityOpt', false);
+      const unitRho = document.getElementById('unitDensity').value;
+
+      const directReStr = getCleanNumericString('inputDirectRe', false);
+
+      const roughAbsStr = getCleanNumericString('inputRoughnessAbs', true);
+      const unitRoughAbs = document.getElementById('unitRoughnessAbs').value;
+
+      const roughRelStr = getCleanNumericString('inputRoughnessRel', true);
+
+      const lenStr = getCleanNumericString('inputLength', false);
+      const unitLen = document.getElementById('unitLength').value;
+
+      // 1. Compute physical SI values for subtexts & optional head loss
+      if (diamStr !== null) {
+        state.D_m = Number(diamStr) * JS_LEN_TO_M[unitDiam];
+        state.area_m2 = (Math.PI * state.D_m * state.D_m) / 4.0;
+      }
+
+      if (rhoStr !== null) {
+        state.rho_kgm3 = Number(rhoStr) * JS_RHO_TO_KGM3[unitRho];
+      }
+
+      if (lenStr !== null) {
+        state.L_m = Number(lenStr) * JS_LEN_TO_M[unitLen];
+      }
+
+      // Check completeness of Reynolds inputs
+      let reInputsReady = false;
+      if (state.reMode === 'direct') {
+        if (directReStr !== null) {
+          state.Re = Number(directReStr);
+          reInputsReady = true;
+        }
+      } else {
+        if (state.D_m !== null && state.area_m2 !== null) {
+          if (state.flowMode === 'V' && velStr !== null) {
+            state.V_ms = Number(velStr) * JS_VEL_TO_MS[unitVel];
+            state.Q_m3s = state.V_ms * state.area_m2;
+          } else if (state.flowMode === 'Q' && flowStr !== null) {
+            state.Q_m3s = Number(flowStr) * JS_FLOW_TO_M3S[unitFlow];
+            state.V_ms = state.Q_m3s / state.area_m2;
+          }
+
+          if (state.viscMode === 'kinematic' && kinStr !== null) {
+            state.nu_m2s = Number(kinStr) * JS_KIN_TO_M2S[unitKin];
+          } else if (state.viscMode === 'dynamic' && dynStr !== null && state.rho_kgm3 !== null) {
+            const mu_Pas = Number(dynStr) * JS_DYN_TO_PAS[unitDyn];
+            state.nu_m2s = mu_Pas / state.rho_kgm3;
+          }
+
+          if (state.V_ms !== null && state.nu_m2s !== null && state.nu_m2s > 0) {
+            state.Re = (state.V_ms * state.D_m) / state.nu_m2s;
+            reInputsReady = true;
+          }
+        }
+      }
+
+      // Check completeness of Roughness inputs
+      let roughInputsReady = false;
+      if (state.roughMode === 'rel') {
+        if (roughRelStr !== null) {
+          state.relRoughness = Number(roughRelStr);
+          roughInputsReady = true;
+        }
+      } else {
+        if (roughAbsStr !== null) {
+          if (Number(roughAbsStr) === 0) {
+            state.relRoughness = 0;
+            roughInputsReady = true;
+          } else if (state.D_m !== null && state.D_m > 0) {
+            const e_m = Number(roughAbsStr) * JS_LEN_TO_M[unitRoughAbs];
+            state.relRoughness = e_m / state.D_m;
+            roughInputsReady = true;
+          }
+        }
+      }
+
+      // Execute 50-Digit Python Decimal Pipeline (if ready) or instant JS fallback
+      if (reInputsReady && roughInputsReady) {
+        state.valid = true;
+
+        const payloadObj = {
+          reMode: state.reMode,
+          directReStr: directReStr,
+          diamStr: diamStr,
+          unitDiam: unitDiam,
+          flowMode: state.flowMode,
+          velStr: velStr,
+          unitVel: unitVel,
+          flowStr: flowStr,
+          unitFlow: unitFlow,
+          viscMode: state.viscMode,
+          kinStr: kinStr,
+          unitKin: unitKin,
+          dynStr: dynStr,
+          unitDyn: unitDyn,
+          rhoStr: rhoStr,
+          unitRho: unitRho,
+          roughMode: state.roughMode,
+          roughAbsStr: roughAbsStr,
+          unitRoughAbs: unitRoughAbs,
+          roughRelStr: roughRelStr
+        };
+
+        if (pyReady && pyodideInstance) {
+          try {
+            pyodideInstance.globals.set("payload_in_json", JSON.stringify(payloadObj));
+            const jsonStr = pyodideInstance.runPython(`solve_full_pipeline_py(payload_in_json)`);
+            const pyRes = JSON.parse(jsonStr);
+
+            state.re_exact_str = pyRes.re_exact;
+            state.Re = pyRes.re_float;
+            state.rel_rough_exact_str = pyRes.rel_rough_exact;
+            state.relRoughness = pyRes.rel_rough_float;
+            state.f_cw_50_str = pyRes.f_cw_50;
+            state.residual_str = pyRes.residual_str;
+            state.f_colebrook = pyRes.f_cw_float;
+            state.f_laminar = pyRes.f_lam_float;
+            state.iterations = pyRes.iterations;
+          } catch (e) {
+            console.error("Python execution error:", e);
+            runJSFallbackSolver(String(state.Re), String(state.relRoughness));
+          }
+        } else {
+          runJSFallbackSolver(String(state.Re), String(state.relRoughness));
+        }
+
+        state.f_churchill = calcChurchill(state.Re, state.relRoughness);
+        state.f_haaland = calcHaaland(state.Re, state.relRoughness);
+        state.f_swamee = calcSwameeJain(state.Re, state.relRoughness);
+        state.f_karman = calcVonKarman(state.relRoughness);
+
+        if (state.Re < 2300) {
+          state.regime = 'Laminar';
+          state.subRegime = 'Hagen-Poiseuille Laminar Flow (f = 64/Re)';
+          state.f_active = state.f_laminar;
+        } else if (state.Re <= 4000) {
+          state.regime = 'Transitional';
+          state.subRegime = 'Critical Transition Zone (2300 ≤ Re ≤ 4000)';
+          state.f_active = state.f_colebrook;
+        } else {
+          state.regime = 'Turbulent';
+          state.f_active = state.f_colebrook;
+
+          const roughnessRe = state.Re * state.relRoughness * Math.sqrt(state.f_colebrook);
+          if (state.relRoughness === 0) {
+            state.subRegime = 'Hydraulically Smooth Turbulent';
+          } else if (roughnessRe >= 200) {
+            state.subRegime = 'Fully Rough (Complete Turbulence)';
+          } else {
+            state.subRegime = 'Transition Roughness Zone';
+          }
+        }
+
+        // Optional Darcy-Weisbach Head Loss & Pressure Drop
+        if (state.V_ms !== null) {
+          state.velHead_m = (state.V_ms * state.V_ms) / (2.0 * g);
+          if (state.rho_kgm3 !== null) {
+            state.wallShear_Pa = (state.f_active / 8.0) * state.rho_kgm3 * state.V_ms * state.V_ms;
+          }
+          if (state.L_m !== null && state.D_m !== null) {
+            state.headLoss_m = state.f_active * (state.L_m / state.D_m) * state.velHead_m;
+            if (state.rho_kgm3 !== null) {
+              state.pressureDrop_Pa = state.rho_kgm3 * g * state.headLoss_m;
+            }
+          }
+        }
+      }
+
+      updateDashboardUI();
+      drawMoodyChart();
+    }
+
+    function runJSFallbackSolver(reStr, rrStr) {
+      const cw = solveColebrookWhiteJS(state.Re, state.relRoughness, true);
+      state.re_exact_str = reStr;
+      state.rel_rough_exact_str = rrStr;
+      state.f_cw_50_str = cw.f.toFixed(16) + ' (Initializing 50-digit Python...)';
+      state.residual_str = cw.residual.toExponential(2);
+      state.f_colebrook = cw.f;
+      state.f_laminar = 64.0 / state.Re;
+      state.iterations = cw.iterations;
+    }
+
+    /*************************************************************************
+     * 8. UI DASHBOARD UPDATER (SHOWS BOTH SI & IMPERIAL READOUTS)
+     *************************************************************************/
+    function fmtSmart(val, sigFigs = 8) {
+      if (val === null || val === undefined || !isFinite(val)) return '--';
+      if (val === 0) return '0';
+      const abs = Math.abs(val);
+      if (abs >= 1e7 || abs < 1e-4) {
+        return val.toExponential(sigFigs - 1);
+      }
+      return Number(val.toPrecision(sigFigs)).toString();
+    }
+
+    function updateDashboardUI() {
+      // Update Diameter & Flow Subtexts (Cross-unit reference)
+      const subD = document.getElementById('subtextDiameter');
+      if (state.D_m !== null) {
+        const d_mm = state.D_m * 1000.0;
+        const d_in = state.D_m / 0.0254;
+        const area_cm2 = state.area_m2 * 1e4;
+        const area_in2 = state.area_m2 / (0.0254 * 0.0254);
+        subD.textContent = `D = ${fmtSmart(state.D_m, 6)} m (${fmtSmart(d_mm, 5)} mm | ${fmtSmart(d_in, 5)} in) • Area = ${fmtSmart(area_cm2, 5)} cm² (${fmtSmart(area_in2, 4)} in²)`;
+      } else {
+        subD.textContent = '';
+      }
+
+      const subV = document.getElementById('subtextVelocity');
+      const subQ = document.getElementById('subtextFlowRate');
+      if (state.V_ms !== null && state.Q_m3s !== null) {
+        const v_fts = state.V_ms / 0.3048;
+        const q_Ls = state.Q_m3s * 1000.0;
+        const q_m3h = state.Q_m3s * 3600.0;
+        const q_gpm = state.Q_m3s * 15850.32314;
+        const flowSummary = `v = ${fmtSmart(state.V_ms, 5)} m/s (${fmtSmart(v_fts, 5)} ft/s) • Q = ${fmtSmart(q_Ls, 5)} L/s (${fmtSmart(q_m3h, 5)} m³/h | ${fmtSmart(q_gpm, 5)} GPM)`;
+        subV.textContent = flowSummary;
+        subQ.textContent = flowSummary;
+      } else {
+        subV.textContent = '';
+        subQ.textContent = '';
+      }
+
+      const roughHint = document.getElementById('roughAbsHint');
+      if (state.roughMode === 'abs' && state.D_m === null) {
+        roughHint.innerHTML = `<span class="text-amber-600 dark:text-amber-400 font-semibold">Note:</span> Enter Pipe Internal Diameter <span class="font-mono">D</span> above or switch to <strong>Direct (e/D)</strong>.`;
+      } else {
+        roughHint.innerHTML = `Computes <span class="font-mono">e / D</span> in 50-digit Python <span class="font-mono">Decimal</span> precision.`;
+      }
+
+      if (!state.valid) {
+        document.getElementById('kpiRe').textContent = state.Re !== null ? fmtSmart(state.Re, 8) : 'Awaiting Inputs';
+        document.getElementById('kpiReSci').textContent = state.Re !== null ? state.Re.toExponential(3) : '--';
+        document.getElementById('kpiF').textContent = '--';
+        document.getElementById('kpiFSource').textContent = '--';
+        document.getElementById('kpiRelRough').textContent = state.relRoughness !== null ? fmtSmart(state.relRoughness, 7) : '--';
+        document.getElementById('kpiRelRoughSci').textContent = '--';
+
+        document.getElementById('pyOutRe').textContent = state.Re !== null ? String(state.Re) : '--';
+        document.getElementById('pyOutRelRough').textContent = state.relRoughness !== null ? String(state.relRoughness) : '--';
+        document.getElementById('pyOutF50').textContent = '--';
+        document.getElementById('pyOutResidual').textContent = '--';
+
+        const regimeCard = document.getElementById('kpiRegimeCard');
+        regimeCard.className = 'rounded-lg px-3 py-1.5 border flex flex-col justify-center bg-slate-100 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700';
+        document.getElementById('kpiRegimeDot').className = 'w-2 h-2 rounded-full bg-slate-400 shrink-0';
+        document.getElementById('kpiRegimeText').className = 'font-bold text-xs sm:text-sm text-slate-500 dark:text-slate-400 truncate';
+        document.getElementById('kpiRegimeText').textContent = 'Incomplete Inputs';
+
+        document.getElementById('subRegimePill').textContent = 'Enter Re & Roughness';
+        document.getElementById('solverStatusBadge').textContent = 'Waiting for input...';
+
+        ['tblFColebrook', 'tblFanningColebrook', 'tblFChurchill', 'tblFanningChurchill', 'tblErrChurchill',
+         'tblFHaaland', 'tblFanningHaaland', 'tblErrHaaland', 'tblFSwamee', 'tblFanningSwamee', 'tblErrSwamee',
+         'tblFKarman', 'tblFanningKarman', 'tblErrKarman', 'tblFLaminar', 'tblFanningLaminar', 'tblNoteLaminar',
+         'resHeadLoss', 'resHeadLossSub', 'resPressureDrop', 'resPressureBar', 'resVelHead', 'resWallShear'
+        ].forEach(id => {
+          document.getElementById(id).textContent = '--';
+        });
+        return;
+      }
+
+      // 1. Top KPI Ribbon
+      document.getElementById('kpiRe').textContent = Number(state.Re.toPrecision(9)).toLocaleString('en-US', { maximumFractionDigits: 4 });
+      document.getElementById('kpiReSci').textContent = state.Re.toExponential(3);
+      document.getElementById('kpiF').textContent = state.f_active.toFixed(8);
+      document.getElementById('kpiFSource').textContent = state.Re < 2300 ? '64/Re' : (pyReady ? 'Py-50d' : 'CW');
+      document.getElementById('kpiRelRough').textContent = state.relRoughness === 0
+        ? '0 (Smooth)'
+        : fmtSmart(state.relRoughness, 7);
+      document.getElementById('kpiRelRoughSci').textContent = state.relRoughness === 0
+        ? '0'
+        : state.relRoughness.toExponential(2);
+
+      // 2. Python 50-Digit Readout Box
+      document.getElementById('pyOutRe').textContent = state.re_exact_str;
+      document.getElementById('pyOutRelRough').textContent = state.rel_rough_exact_str;
+      document.getElementById('pyOutF50').textContent = state.f_cw_50_str;
+      document.getElementById('pyOutResidual').textContent = state.residual_str;
+
+      // 3. Regime Styling
+      const regimeCard = document.getElementById('kpiRegimeCard');
+      const regimeDot = document.getElementById('kpiRegimeDot');
+      const regimeText = document.getElementById('kpiRegimeText');
+      const subRegimePill = document.getElementById('subRegimePill');
+
+      regimeText.textContent = state.regime;
+      subRegimePill.textContent = state.subRegime;
+
+      if (state.regime === 'Laminar') {
+        regimeCard.className = 'rounded-lg px-3 py-1.5 border flex flex-col justify-center bg-sky-500/10 border-sky-500/30';
+        regimeDot.className = 'w-2 h-2 rounded-full bg-sky-500 animate-pulse shrink-0';
+        regimeText.className = 'font-bold text-xs sm:text-sm text-sky-600 dark:text-sky-400 truncate';
+        subRegimePill.className = 'text-[10px] font-mono px-2 py-0.5 rounded-full bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20';
+      } else if (state.regime === 'Transitional') {
+        regimeCard.className = 'rounded-lg px-3 py-1.5 border flex flex-col justify-center bg-amber-500/10 border-amber-500/30';
+        regimeDot.className = 'w-2 h-2 rounded-full bg-amber-500 animate-pulse shrink-0';
+        regimeText.className = 'font-bold text-xs sm:text-sm text-amber-600 dark:text-amber-400 truncate';
+        subRegimePill.className = 'text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20';
+      } else {
+        regimeCard.className = 'rounded-lg px-3 py-1.5 border flex flex-col justify-center bg-emerald-500/10 border-emerald-500/30';
+        regimeDot.className = 'w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0';
+        regimeText.className = 'font-bold text-xs sm:text-sm text-emerald-600 dark:text-emerald-400 truncate';
+        subRegimePill.className = 'text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20';
+      }
+
+      // 4. Hydraulic Loss Outputs (Dual Metric + Imperial Readout)
+      if (state.headLoss_m !== null) {
+        const hf_ft = state.headLoss_m / 0.3048;
+        document.getElementById('resHeadLoss').textContent = `${fmtSmart(state.headLoss_m, 5)} m`;
+        document.getElementById('resHeadLossSub').textContent = `${fmtSmart(hf_ft, 5)} ft`;
+      } else {
+        document.getElementById('resHeadLoss').textContent = 'Need L, D, v';
+        document.getElementById('resHeadLossSub').textContent = '--';
+      }
+
+      if (state.pressureDrop_Pa !== null) {
+        const dP_kPa = state.pressureDrop_Pa / 1000.0;
+        const dP_bar = state.pressureDrop_Pa / 1e5;
+        const dP_psi = state.pressureDrop_Pa * 0.000145037738;
+        document.getElementById('resPressureDrop').textContent = `${fmtSmart(dP_kPa, 5)} kPa`;
+        document.getElementById('resPressureBar').textContent = `${fmtSmart(dP_psi, 4)} psi (${fmtSmart(dP_bar, 4)} bar)`;
+      } else {
+        document.getElementById('resPressureDrop').textContent = 'Need ρ & hf';
+        document.getElementById('resPressureBar').textContent = '--';
+      }
+
+      if (state.velHead_m !== null) {
+        const vh_ft = state.velHead_m / 0.3048;
+        document.getElementById('resVelHead').textContent = `${fmtSmart(state.velHead_m, 4)} m (${fmtSmart(vh_ft, 4)} ft)`;
+        document.getElementById('resWallShear').textContent = state.wallShear_Pa !== null
+          ? `τw = ${fmtSmart(state.wallShear_Pa, 5)} Pa`
+          : 'τw: Need ρ';
+      } else {
+        document.getElementById('resVelHead').textContent = 'Need v';
+        document.getElementById('resWallShear').textContent = '--';
+      }
+
+      // 5. Solver Iteration Log & Multi-Correlation Comparison Table
+      document.getElementById('solverStatusBadge').textContent =
+        `${pyReady ? 'Python 50-Digit NR' : 'Newton-Raphson'}: Converged (|R| = ${state.residual_str})`;
+
+      const tbody = document.getElementById('iterationTableBody');
+      tbody.innerHTML = state.iterations.map(it => `
+        <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+          <td class="py-1.5 px-3 font-semibold text-sky-600 dark:text-sky-400">${it.step === 0 ? '0 (Haaland)' : it.step}</td>
+          <td class="py-1.5 px-3">${it.x.toFixed(10)}</td>
+          <td class="py-1.5 px-3 font-bold">${it.f.toFixed(12)}</td>
+          <td class="py-1.5 px-3 text-emerald-600 dark:text-emerald-400">${it.residual.toExponential(3)}</td>
+        </tr>
+      `).join('');
+
+      document.getElementById('tblFColebrook').textContent = state.f_colebrook.toFixed(10);
+      document.getElementById('tblFanningColebrook').textContent = (state.f_colebrook / 4.0).toFixed(10);
+
+      document.getElementById('tblFChurchill').textContent = state.f_churchill.toFixed(10);
+      document.getElementById('tblFanningChurchill').textContent = (state.f_churchill / 4.0).toFixed(10);
+      const errCh = ((state.f_churchill - state.f_colebrook) / state.f_colebrook) * 100.0;
+      document.getElementById('tblErrChurchill').textContent = `${errCh >= 0 ? '+' : ''}${errCh.toFixed(3)}%`;
+
+      document.getElementById('tblFSwamee').textContent = state.f_swamee.toFixed(10);
+      document.getElementById('tblFanningSwamee').textContent = (state.f_swamee / 4.0).toFixed(10);
+      const errS = ((state.f_swamee - state.f_colebrook) / state.f_colebrook) * 100.0;
+      document.getElementById('tblErrSwamee').textContent = `${errS >= 0 ? '+' : ''}${errS.toFixed(3)}%`;
+
+      document.getElementById('tblFHaaland').textContent = state.f_haaland.toFixed(10);
+      document.getElementById('tblFanningHaaland').textContent = (state.f_haaland / 4.0).toFixed(10);
+      const errH = ((state.f_haaland - state.f_colebrook) / state.f_colebrook) * 100.0;
+      document.getElementById('tblErrHaaland').textContent = `${errH >= 0 ? '+' : ''}${errH.toFixed(3)}%`;
+
+      if (state.f_karman !== null) {
+        document.getElementById('tblFKarman').textContent = state.f_karman.toFixed(10);
+        document.getElementById('tblFanningKarman').textContent = (state.f_karman / 4.0).toFixed(10);
+        const errK = ((state.f_karman - state.f_colebrook) / state.f_colebrook) * 100.0;
+        document.getElementById('tblErrKarman').textContent = `${errK >= 0 ? '+' : ''}${errK.toFixed(2)}%`;
+      } else {
+        document.getElementById('tblFKarman').textContent = 'N/A (Smooth)';
+        document.getElementById('tblFanningKarman').textContent = '--';
+        document.getElementById('tblErrKarman').textContent = '--';
+      }
+
+      document.getElementById('tblFLaminar').textContent = state.f_laminar.toFixed(10);
+      document.getElementById('tblFanningLaminar').textContent = (state.f_laminar / 4.0).toFixed(10);
+      document.getElementById('tblNoteLaminar').textContent = state.Re < 2300 ? 'Active (Laminar)' : 'Re ≥ 2300';
+    }
+
+    /*************************************************************************
+     * 9. 1-CLICK LOAD USER TEST CASE & CLEAR HANDLERS
+     *************************************************************************/
+    function loadUserTestCase() {
+      setPipeSelectMode('manual');
+      applyUnitSystemPreset('SI_BASE');
+      setReMode('calc');
+      setFlowMode('V');
+      setViscMode('kinematic');
+      setRoughnessMode('abs');
+
+      document.getElementById('selectFluidPreset').value = 'custom';
+      document.getElementById('fluidPresetSummaryBadge').classList.add('hidden');
+      document.getElementById('fluidPresetTag').textContent = 'Manual / Custom';
+      document.getElementById('selectRoughMaterial').value = 'custom';
+      document.getElementById('inputVelocity').value = '1.5';
+      document.getElementById('inputDiameter').value = '0.3';
+      document.getElementById('inputKinVisc').value = '1.00E-06';
+      document.getElementById('inputRoughnessAbs').value = '0.00015';
+
+      document.getElementById('inputLength').value = '100';
+      document.getElementById('inputDensityOpt').value = '1000';
+      document.getElementById('inputDensity').value = '1000';
+
+      recalculateAll();
+      showToast('Loaded Test Case: v=1.5 m/s, D=0.3 m, ν=1.00E-06 m²/s, e=0.00015 m');
+    }
+
+    function clearAllInputs() {
+      document.getElementById('selectFluidPreset').value = 'custom';
+      document.getElementById('fluidPresetSummaryBadge').classList.add('hidden');
+      document.getElementById('fluidPresetTag').textContent = 'Manual / Custom';
+      document.getElementById('selectRoughMaterial').value = 'custom';
+      [
+        'inputDiameter', 'inputVelocity', 'inputFlowRate',
+        'inputDynVisc', 'inputKinVisc', 'inputDensity', 'inputDensityOpt',
+        'inputDirectRe', 'inputRoughnessAbs', 'inputRoughnessRel', 'inputLength'
+      ].forEach(id => {
+        document.getElementById(id).value = '';
+      });
+      recalculateAll();
+      showToast('All inputs cleared');
+    }
+
+    /*************************************************************************
+     * 7. HIGH-DPI INTERACTIVE MOODY CHART ENGINE (HTML5 CANVAS)
+     *************************************************************************/
+    const CHART_BOUNDS = {
+      logReMin: Math.log10(600),
+      logReMax: 8.0,
+      logFMin: Math.log10(0.008),
+      logFMax: Math.log10(0.10)
+    };
+
+    function buildMoodyCurveCache() {
+      const numSamples = 140;
+      const logReStart = Math.log10(2300);
+      const logReEnd = 8.0;
+
+      const family = STANDARD_REL_ROUGHNESS.map(relRough => {
+        const pts = [];
+        for (let i = 0; i <= numSamples; i++) {
+          const logRe = logReStart + (i / numSamples) * (logReEnd - logReStart);
+          const re = Math.pow(10, logRe);
+          const f = solveColebrookWhiteJS(re, relRough, false).f;
+          pts.push({ re, f });
+        }
+        return { relRough, pts };
+      });
+
+      const smoothPts = [];
+      for (let i = 0; i <= numSamples; i++) {
+        const logRe = logReStart + (i / numSamples) * (logReEnd - logReStart);
+        const re = Math.pow(10, logRe);
+        const f = solveColebrookWhiteJS(re, 0, false).f;
+        smoothPts.push({ re, f });
+      }
+
+      const roughBoundaryPts = [];
+      const logRoughMin = Math.log10(0.00001);
+      const logRoughMax = Math.log10(0.05);
+      for (let i = 0; i <= 80; i++) {
+        const rr = Math.pow(10, logRoughMin + (i / 80) * (logRoughMax - logRoughMin));
+        const fRough = calcVonKarman(rr);
+        const reThreshold = 200.0 / (rr * Math.sqrt(fRough));
+        const fActual = solveColebrookWhiteJS(reThreshold, rr, false).f;
+        if (reThreshold >= 3500 && reThreshold <= 1e8 && fActual >= 0.008 && fActual <= 0.10) {
+          roughBoundaryPts.push({ re: reThreshold, f: fActual });
+        }
+      }
+
+      moodyCurveCache = { family, smoothPts, roughBoundaryPts };
+    }
+
+    function getChartMargins(width) {
+      const isCompact = width < 500;
+      return {
+        top: isCompact ? 24 : 30,
+        right: isCompact ? 50 : 64,
+        bottom: isCompact ? 42 : 50,
+        left: isCompact ? 46 : 58
+      };
+    }
+
+    function mapReToX(re, plotLeft, plotWidth) {
+      const logRe = Math.log10(Math.max(600, Math.min(1e8, re)));
+      const t = (logRe - CHART_BOUNDS.logReMin) / (CHART_BOUNDS.logReMax - CHART_BOUNDS.logReMin);
+      return plotLeft + t * plotWidth;
+    }
+
+    function mapFToY(f, plotTop, plotHeight) {
+      const logF = Math.log10(Math.max(0.008, Math.min(0.10, f)));
+      const t = (logF - CHART_BOUNDS.logFMin) / (CHART_BOUNDS.logFMax - CHART_BOUNDS.logFMin);
+      return plotTop + plotHeight - t * plotHeight;
+    }
+
+    function mapXToRe(x, plotLeft, plotWidth) {
+      const t = Math.max(0, Math.min(1, (x - plotLeft) / plotWidth));
+      const logRe = CHART_BOUNDS.logReMin + t * (CHART_BOUNDS.logReMax - CHART_BOUNDS.logReMin);
+      return Math.pow(10, logRe);
+    }
+
+    function mapYToF(y, plotTop, plotHeight) {
+      const t = Math.max(0, Math.min(1, (plotTop + plotHeight - y) / plotHeight));
+      const logF = CHART_BOUNDS.logFMin + t * (CHART_BOUNDS.logFMax - CHART_BOUNDS.logFMin);
+      return Math.pow(10, logF);
+    }
+
+    function drawMoodyChart() {
+      if (!moodyCurveCache) buildMoodyCurveCache();
+
+      const canvas = document.getElementById('moodyCanvas');
+      const container = document.getElementById('canvasContainer');
+      if (!canvas || !container) return;
+
+      const rect = container.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      const width = Math.max(300, rect.width);
+      const height = Math.max(260, rect.height);
+
+      if (canvas.width !== Math.round(width * dpr) || canvas.height !== Math.round(height * dpr)) {
+        canvas.width = Math.round(width * dpr);
+        canvas.height = Math.round(height * dpr);
+      }
+
+      const ctx = canvas.getContext('2d');
+      ctx.save();
+      ctx.scale(dpr, dpr);
+
+      const isDark = document.documentElement.classList.contains('dark');
+      const margins = getChartMargins(width);
+      const plotLeft = margins.left;
+      const plotTop = margins.top;
+      const plotWidth = width - margins.left - margins.right;
+      const plotHeight = height - margins.top - margins.bottom;
+      const plotRight = plotLeft + plotWidth;
+      const plotBottom = plotTop + plotHeight;
+
+      ctx.fillStyle = isDark ? '#090e1a' : '#f8fafc';
+      ctx.fillRect(0, 0, width, height);
+
+      ctx.fillStyle = isDark ? '#0f172a' : '#ffffff';
+      ctx.fillRect(plotLeft, plotTop, plotWidth, plotHeight);
+
+      const x2300 = mapReToX(2300, plotLeft, plotWidth);
+      const x4000 = mapReToX(4000, plotLeft, plotWidth);
+
+      ctx.fillStyle = 'rgba(14, 165, 233, 0.05)';
+      ctx.fillRect(plotLeft, plotTop, x2300 - plotLeft, plotHeight);
+
+      ctx.fillStyle = 'rgba(245, 158, 11, 0.09)';
+      ctx.fillRect(x2300, plotTop, x4000 - x2300, plotHeight);
+
+      ctx.lineWidth = 1;
+      for (let exp = 2; exp <= 8; exp++) {
+        const base = Math.pow(10, exp);
+        for (let m = 1; m <= 9; m++) {
+          const reVal = m * base;
+          if (reVal < 600 || reVal > 1e8) continue;
+          const x = mapReToX(reVal, plotLeft, plotWidth);
+          ctx.beginPath();
+          ctx.moveTo(x, plotTop);
+          ctx.lineTo(x, plotBottom);
+          ctx.strokeStyle = m === 1
+            ? (isDark ? 'rgba(148, 163, 184, 0.28)' : 'rgba(100, 116, 139, 0.28)')
+            : (isDark ? 'rgba(148, 163, 184, 0.09)' : 'rgba(148, 163, 184, 0.16)');
+          ctx.stroke();
+        }
+      }
+
+      const fGridValues = [
+        0.008, 0.009, 0.01, 0.012, 0.014, 0.015, 0.016, 0.018,
+        0.02, 0.025, 0.03, 0.035, 0.04, 0.045, 0.05, 0.06, 0.07, 0.08, 0.09, 0.10
+      ];
+      const fLabeledValues = new Set([0.008, 0.01, 0.015, 0.02, 0.025, 0.03, 0.04, 0.05, 0.06, 0.08, 0.10]);
+
+      fGridValues.forEach(fVal => {
+        const y = mapFToY(fVal, plotTop, plotHeight);
+        ctx.beginPath();
+        ctx.moveTo(plotLeft, y);
+        ctx.lineTo(plotRight, y);
+        ctx.strokeStyle = fLabeledValues.has(fVal)
+          ? (isDark ? 'rgba(148, 163, 184, 0.26)' : 'rgba(100, 116, 139, 0.26)')
+          : (isDark ? 'rgba(148, 163, 184, 0.09)' : 'rgba(148, 163, 184, 0.15)');
+        ctx.stroke();
+      });
+
+      ctx.save();
+      ctx.setLineDash([4, 4]);
+      ctx.strokeStyle = isDark ? 'rgba(245, 158, 11, 0.45)' : 'rgba(217, 119, 6, 0.5)';
+      ctx.beginPath();
+      ctx.moveTo(x2300, plotTop);
+      ctx.lineTo(x2300, plotBottom);
+      ctx.moveTo(x4000, plotTop);
+      ctx.lineTo(x4000, plotBottom);
+      ctx.stroke();
+      ctx.restore();
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(plotLeft, plotTop, plotWidth, plotHeight);
+      ctx.clip();
+
+      if (moodyCurveCache.roughBoundaryPts.length > 1) {
+        ctx.save();
+        ctx.setLineDash([5, 4]);
+        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = isDark ? 'rgba(251, 113, 133, 0.65)' : 'rgba(225, 29, 72, 0.65)';
+        ctx.beginPath();
+        moodyCurveCache.roughBoundaryPts.forEach((pt, idx) => {
+          const x = mapReToX(pt.re, plotLeft, plotWidth);
+          const y = mapFToY(pt.f, plotTop, plotHeight);
+          if (idx === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      moodyCurveCache.family.forEach(curve => {
+        ctx.beginPath();
+        curve.pts.forEach((pt, idx) => {
+          const x = mapReToX(pt.re, plotLeft, plotWidth);
+          const y = mapFToY(pt.f, plotTop, plotHeight);
+          if (idx === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        });
+        ctx.lineWidth = 1.2;
+        ctx.strokeStyle = isDark ? 'rgba(148, 163, 184, 0.42)' : 'rgba(71, 85, 105, 0.45)';
+        ctx.stroke();
+      });
+
+      ctx.beginPath();
+      moodyCurveCache.smoothPts.forEach((pt, idx) => {
+        const x = mapReToX(pt.re, plotLeft, plotWidth);
+        const y = mapFToY(pt.f, plotTop, plotHeight);
+        if (idx === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.lineWidth = 2.0;
+      ctx.strokeStyle = isDark ? '#38bdf8' : '#0284c7';
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(mapReToX(640, plotLeft, plotWidth), mapFToY(64 / 640, plotTop, plotHeight));
+      ctx.lineTo(mapReToX(2300, plotLeft, plotWidth), mapFToY(64 / 2300, plotTop, plotHeight));
+      ctx.lineWidth = 2.4;
+      ctx.strokeStyle = isDark ? '#34d399' : '#059669';
+      ctx.stroke();
+
+      if (state.valid) {
+        ctx.save();
+        ctx.beginPath();
+        const numUserPts = 120;
+        const logStart = Math.log10(2300);
+        const logEnd = 8.0;
+        for (let i = 0; i <= numUserPts; i++) {
+          const logRe = logStart + (i / numUserPts) * (logEnd - logStart);
+          const re = Math.pow(10, logRe);
+          const fVal = solveColebrookWhiteJS(re, state.relRoughness, false).f;
+          const x = mapReToX(re, plotLeft, plotWidth);
+          const y = mapFToY(fVal, plotTop, plotHeight);
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.lineWidth = 2.6;
+        ctx.strokeStyle = isDark ? '#fbbf24' : '#d97706';
+        ctx.shadowColor = isDark ? 'rgba(251, 191, 36, 0.45)' : 'rgba(217, 119, 6, 0.3)';
+        ctx.shadowBlur = 6;
+        ctx.stroke();
+        ctx.restore();
+
+        const opRe = Math.max(600, Math.min(1e8, state.Re));
+        const opF = Math.max(0.008, Math.min(0.10, state.f_active));
+        const opX = mapReToX(opRe, plotLeft, plotWidth);
+        const opY = mapFToY(opF, plotTop, plotHeight);
+
+        ctx.save();
+        ctx.setLineDash([4, 4]);
+        ctx.lineWidth = 1.4;
+        ctx.strokeStyle = isDark ? '#38bdf8' : '#0284c7';
+        ctx.beginPath();
+        ctx.moveTo(opX, plotTop);
+        ctx.lineTo(opX, plotBottom);
+        ctx.moveTo(plotLeft, opY);
+        ctx.lineTo(plotRight, opY);
+        ctx.stroke();
+        ctx.restore();
+
+        ctx.save();
+        ctx.fillStyle = isDark ? 'rgba(56, 189, 248, 0.25)' : 'rgba(2, 132, 199, 0.22)';
+        ctx.beginPath();
+        ctx.arc(opX, opY, 12, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = isDark ? '#38bdf8' : '#0284c7';
+        ctx.beginPath();
+        ctx.arc(opX, opY, 7, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(opX, opY, 3.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
+        const boxW = 162;
+        const boxH = 54;
+        let boxX = opX + 14;
+        let boxY = opY - boxH - 10;
+        if (boxX + boxW > plotRight - 6) boxX = opX - boxW - 14;
+        if (boxY < plotTop + 6) boxY = opY + 14;
+
+        ctx.save();
+        ctx.fillStyle = isDark ? 'rgba(15, 23, 42, 0.92)' : 'rgba(255, 255, 255, 0.94)';
+        ctx.strokeStyle = isDark ? 'rgba(56, 189, 248, 0.6)' : 'rgba(2, 132, 199, 0.6)';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.roundRect(boxX, boxY, boxW, boxH, 8);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.font = 'bold 10px "JetBrains Mono", monospace';
+        ctx.fillStyle = isDark ? '#38bdf8' : '#0284c7';
+        ctx.fillText(`Re = ${state.Re.toExponential(3)}`, boxX + 8, boxY + 16);
+
+        ctx.fillStyle = isDark ? '#f8fafc' : '#0f172a';
+        ctx.fillText(`f  = ${state.f_active.toFixed(6)}`, boxX + 8, boxY + 31);
+
+        ctx.fillStyle = isDark ? '#fbbf24' : '#d97706';
+        const roughTxt = state.relRoughness === 0 ? '0 (Smooth)' : state.relRoughness.toExponential(3);
+        ctx.fillText(`e/D= ${roughTxt}`, boxX + 8, boxY + 46);
+        ctx.restore();
+      }
+
+      if (state.probeActive && state.probeRe && state.probeF) {
+        const px = mapReToX(state.probeRe, plotLeft, plotWidth);
+        const py = mapFToY(state.probeF, plotTop, plotHeight);
+        ctx.save();
+        ctx.setLineDash([2, 3]);
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = isDark ? 'rgba(148, 163, 184, 0.7)' : 'rgba(71, 85, 105, 0.7)';
+        ctx.beginPath();
+        ctx.moveTo(px, plotTop);
+        ctx.lineTo(px, plotBottom);
+        ctx.moveTo(plotLeft, py);
+        ctx.lineTo(plotRight, py);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      ctx.restore();
+
+      ctx.strokeStyle = isDark ? '#334155' : '#94a3b8';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(plotLeft, plotTop, plotWidth, plotHeight);
+
+      ctx.font = '500 10px "JetBrains Mono", monospace';
+      ctx.fillStyle = isDark ? '#94a3b8' : '#475569';
+
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      for (let exp = 3; exp <= 8; exp++) {
+        const x = mapReToX(Math.pow(10, exp), plotLeft, plotWidth);
+        ctx.fillText(`10^${exp}`, x, plotBottom + 6);
+      }
+
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'middle';
+      fLabeledValues.forEach(fVal => {
+        const y = mapFToY(fVal, plotTop, plotHeight);
+        ctx.fillText(fVal.toFixed(3).replace(/0$/, ''), plotLeft - 6, y);
+      });
+
+      ctx.textAlign = 'left';
+      ctx.font = '500 9.5px "JetBrains Mono", monospace';
+      moodyCurveCache.family.forEach(curve => {
+        const lastPt = curve.pts[curve.pts.length - 1];
+        const y = mapFToY(lastPt.f, plotTop, plotHeight);
+        if (y >= plotTop + 4 && y <= plotBottom - 4) {
+          ctx.fillStyle = isDark ? '#94a3b8' : '#475569';
+          ctx.fillText(String(curve.relRough), plotRight + 5, y);
+        }
+      });
+
+      ctx.font = '600 10px "Inter", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      ctx.fillStyle = isDark ? 'rgba(56, 189, 248, 0.8)' : 'rgba(2, 132, 199, 0.85)';
+      ctx.fillText('Laminar', (plotLeft + x2300) / 2, plotTop + 6);
+
+      ctx.fillStyle = isDark ? 'rgba(251, 191, 36, 0.85)' : 'rgba(217, 119, 6, 0.9)';
+      ctx.fillText('Trans.', (x2300 + x4000) / 2, plotTop + 6);
+
+      ctx.fillStyle = isDark ? 'rgba(52, 211, 153, 0.8)' : 'rgba(5, 150, 105, 0.85)';
+      ctx.fillText('Turbulent Zone (Smooth → Transition → Fully Rough)', (x4000 + plotRight) / 2, plotTop + 6);
+
+      ctx.font = '600 11px "Inter", sans-serif';
+      ctx.fillStyle = isDark ? '#cbd5e1' : '#334155';
+      ctx.textAlign = 'center';
+      ctx.fillText('Reynolds Number, Re = v·D / ν = ρ·v·D / μ  (SI Dimensionless)', plotLeft + plotWidth / 2, height - 14);
+
+      ctx.save();
+      ctx.translate(13, plotTop + plotHeight / 2);
+      ctx.rotate(-Math.PI / 2);
+      ctx.textAlign = 'center';
+      ctx.fillText('Darcy Friction Factor, f', 0, 0);
+      ctx.restore();
+
+      ctx.save();
+      ctx.translate(width - 10, plotTop + plotHeight / 2);
+      ctx.rotate(Math.PI / 2);
+      ctx.textAlign = 'center';
+      ctx.fillStyle = isDark ? '#fbbf24' : '#d97706';
+      ctx.fillText('Relative Roughness, e/D', 0, 0);
+      ctx.restore();
+
+      ctx.restore();
+    }
+
+    /*************************************************************************
+     * 8. CANVAS INTERACTION & UTILITY FUNCTIONS
+     *************************************************************************/
+    function setChartTouchMode(mode) {
+      state.chartTouchMode = mode;
+      const btnInspect = document.getElementById('btnTouchInspect');
+      const btnSet = document.getElementById('btnTouchSet');
+
+      if (mode === 'inspect') {
+        btnInspect.className = 'px-2 py-1 rounded-md font-semibold bg-white dark:bg-slate-900 text-sky-600 dark:text-sky-400 shadow-sm flex items-center gap-1';
+        btnSet.className = 'px-2 py-1 rounded-md font-semibold text-slate-600 dark:text-slate-400 flex items-center gap-1';
+      } else {
+        btnSet.className = 'px-2 py-1 rounded-md font-semibold bg-white dark:bg-slate-900 text-sky-600 dark:text-sky-400 shadow-sm flex items-center gap-1';
+        btnInspect.className = 'px-2 py-1 rounded-md font-semibold text-slate-600 dark:text-slate-400 flex items-center gap-1';
+      }
+    }
+
+    function initCanvasInteractions() {
+      const canvas = document.getElementById('moodyCanvas');
+      let isPointerDown = false;
+
+      function handlePointer(clientX, clientY, isActivelySetting) {
+        const rect = canvas.getBoundingClientRect();
+        const x = clientX - rect.left;
+        const y = clientY - rect.top;
+        const margins = getChartMargins(rect.width);
+        const plotLeft = margins.left;
+        const plotTop = margins.top;
+        const plotWidth = rect.width - margins.left - margins.right;
+        const plotHeight = rect.height - margins.top - margins.bottom;
+
+        if (x < plotLeft || x > plotLeft + plotWidth || y < plotTop || y > plotTop + plotHeight) {
+          state.probeActive = false;
+          document.getElementById('chartInspectorHud').classList.add('hidden');
+          drawMoodyChart();
+          return;
+        }
+
+        const re = mapXToRe(x, plotLeft, plotWidth);
+        const fCursor = mapYToF(y, plotTop, plotHeight);
+        const inferredRelRough = re < 2300 ? 0 : inferRelRoughnessFromReAndF(re, fCursor);
+
+        const hud = document.getElementById('chartInspectorHud');
+        hud.classList.remove('hidden');
+        document.getElementById('hudRe').textContent = `Re: ${re.toExponential(3)}`;
+        document.getElementById('hudF').textContent = `f: ${fCursor.toFixed(5)}`;
+        document.getElementById('hudED').textContent = `e/D: ${inferredRelRough.toExponential(2)}`;
+
+        if (state.chartTouchMode === 'set' && isActivelySetting) {
+          if (state.reMode !== 'direct') setReMode('direct');
+          if (state.roughMode !== 'rel') setRoughnessMode('rel');
+          document.getElementById('inputDirectRe').value = Math.round(re).toString();
+          document.getElementById('inputRoughnessRel').value = Number(inferredRelRough.toPrecision(5)).toString();
+          state.probeActive = false;
+          recalculateAll();
+        } else {
+          state.probeActive = true;
+          state.probeRe = re;
+          state.probeF = fCursor;
+          state.probeRelRough = inferredRelRough;
+          drawMoodyChart();
+        }
+      }
+
+      canvas.addEventListener('mousedown', e => {
+        isPointerDown = true;
+        handlePointer(e.clientX, e.clientY, true);
+      });
+      window.addEventListener('mousemove', e => {
+        if (e.target === canvas || isPointerDown) {
+          handlePointer(e.clientX, e.clientY, isPointerDown);
+        }
+      });
+      window.addEventListener('mouseup', () => { isPointerDown = false; });
+      canvas.addEventListener('mouseleave', () => {
+        if (!isPointerDown) {
+          state.probeActive = false;
+          document.getElementById('chartInspectorHud').classList.add('hidden');
+          drawMoodyChart();
+        }
+      });
+
+      canvas.addEventListener('touchstart', e => {
+        if (e.touches.length === 1) {
+          isPointerDown = true;
+          handlePointer(e.touches[0].clientX, e.touches[0].clientY, true);
+        }
+      }, { passive: true });
+      canvas.addEventListener('touchmove', e => {
+        if (e.touches.length === 1 && isPointerDown) {
+          handlePointer(e.touches[0].clientX, e.touches[0].clientY, true);
+        }
+      }, { passive: true });
+      canvas.addEventListener('touchend', () => { isPointerDown = false; });
+    }
+
+    function togglePythonSourceDrawer() {
+      const drawer = document.getElementById('pySourceDrawer');
+      const txt = document.getElementById('btnPyCodeToggleText');
+      if (drawer.classList.contains('hidden')) {
+        drawer.classList.remove('hidden');
+        txt.textContent = 'Hide Python Code';
+      } else {
+        drawer.classList.add('hidden');
+        txt.textContent = 'View Python Code';
+      }
+    }
+
+    function copyExactF() {
+      if (!state.valid) return;
+      const temp = document.createElement('textarea');
+      temp.value = state.f_cw_50_str;
+      document.body.appendChild(temp);
+      temp.select();
+      document.execCommand('copy');
+      document.body.removeChild(temp);
+      showToast('Copied 50-digit Python f to clipboard!');
+    }
+
+    function toggleFullscreenChart() {
+      const card = document.getElementById('moodyCardContainer');
+      const icon = document.getElementById('iconFullscreen');
+      const txt = document.getElementById('textFullscreen');
+      state.isFullscreen = !state.isFullscreen;
+
+      if (state.isFullscreen) {
+        card.classList.add('chart-fullscreen');
+        icon.className = 'fa-solid fa-compress';
+        txt.textContent = 'Close';
+      } else {
+        card.classList.remove('chart-fullscreen');
+        icon.className = 'fa-solid fa-expand';
+        txt.textContent = 'Expand';
+      }
+      setTimeout(drawMoodyChart, 50);
+    }
+
+    function toggleIterationTable() {
+      const container = document.getElementById('iterationLogContainer');
+      const btnText = document.getElementById('btnIterText');
+      if (container.classList.contains('hidden')) {
+        container.classList.remove('hidden');
+        btnText.textContent = 'Hide Iteration Log';
+      } else {
+        container.classList.add('hidden');
+        btnText.textContent = 'Show Iteration Log';
+      }
+    }
+
+    function exportMoodyPNG() {
+      const canvas = document.getElementById('moodyCanvas');
+      const link = document.createElement('a');
+      const reTag = state.Re ? Math.round(state.Re) : 'blank';
+      link.download = `MoodyFlow_SI_Python_Re_${reTag}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+      showToast('Moody Chart PNG downloaded');
+    }
+
+    function copySummaryReport() {
+      if (!state.valid) {
+        showToast('Enter valid inputs before copying report');
+        return;
+      }
+      const lines = [
+        '=== MOODYFLOW SI — PYTHON 50-DIGIT PRECISION REPORT ===',
+        `Flow Regime:               ${state.regime} (${state.subRegime})`,
+        `Reynolds Number (Re):      ${state.re_exact_str}`,
+        `Relative Roughness (e/D):  ${state.rel_rough_exact_str}`,
+        `Colebrook-White f (50-d):  ${state.f_cw_50_str}`,
+        `Colebrook Residual |R|:    ${state.residual_str}`,
+        `Churchill (1977) f:        ${state.f_churchill.toFixed(10)}`,
+        `Swamee-Jain (1976) f:      ${state.f_swamee.toFixed(10)}`,
+        `Haaland (1983) f:          ${state.f_haaland.toFixed(10)}`,
+        `Head Loss hf (m):          ${state.headLoss_m !== null ? state.headLoss_m.toFixed(6) : 'N/A'}`,
+        `Pressure Drop ΔP (kPa):    ${state.pressureDrop_Pa !== null ? (state.pressureDrop_Pa / 1000).toFixed(6) : 'N/A'}`
+      ].join('\n');
+
+      const tempArea = document.createElement('textarea');
+      tempArea.value = lines;
+      document.body.appendChild(tempArea);
+      tempArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(tempArea);
+      showToast('50-digit Python engineering report copied!');
+    }
+
+    function showToast(msg) {
+      const banner = document.getElementById('toastBanner');
+      document.getElementById('toastMessage').textContent = msg;
+      banner.classList.remove('opacity-0', 'translate-y-2');
+      setTimeout(() => {
+        banner.classList.add('opacity-0', 'translate-y-2');
+      }, 2600);
+    }
+
+    function toggleTheme() {
+      const html = document.documentElement;
+      const icon = document.getElementById('themeIcon');
+      html.classList.toggle('dark');
+      const isDark = html.classList.contains('dark');
+      icon.className = isDark
+        ? 'fa-solid fa-sun text-amber-400 text-sm'
+        : 'fa-solid fa-moon text-slate-700 text-sm';
+      drawMoodyChart();
+    }
+
+    window.onload = function () {
+      initPipeScheduleDropdowns();
+      buildMoodyCurveCache();
+      initCanvasInteractions();
+      recalculateAll();
+      initPythonEngine();
+
+      window.addEventListener('resize', () => {
+        drawMoodyChart();
+      });
+    };
+  </script>
+</body>
+</html>
